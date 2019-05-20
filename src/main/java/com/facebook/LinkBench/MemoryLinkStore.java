@@ -126,6 +126,8 @@ public class MemoryLinkStore extends GraphStore {
   private final Map<String, Map<LinkLookupKey, SortedSet<Link>>> linkdbs;
 
   private final Map<String, NodeDB> nodedbs;
+  private long _getlinklistcount = 0;
+  private long _getlinklisttime = 0;
 
   /**
    * Storage for objects
@@ -307,6 +309,7 @@ public class MemoryLinkStore extends GraphStore {
       long minTimestamp, long maxTimestamp, int offset, int limit)
       throws Exception {
     int skipped = 0; // used for offset
+    long start_time = System.nanoTime();
     synchronized (linkdbs) {
       SortedSet<Link> linkSet = findLinkByKey(dbid, id1, link_type, false);
       if (linkSet == null || linkSet.size() == 0) {
@@ -348,6 +351,15 @@ public class MemoryLinkStore extends GraphStore {
               break;
             }
           }
+        }
+        long end_time = System.nanoTime();
+        _getlinklistcount += 1;
+        _getlinklisttime         += end_time - start_time;
+        if (_getlinklistcount % 10000 == 0) {
+          System.err.println("get link list average time = " + 
+                             (_getlinklisttime / _getlinklistcount));
+          _getlinklistcount = 0;
+          _getlinklisttime = 0;
         }
         return res;
       }
@@ -433,8 +445,12 @@ public class MemoryLinkStore extends GraphStore {
     synchronized(nodedbs) {
       NodeDB db = getNodeDB(dbid, false);
       Node n = db.data.get(id);
-      if (n == null || n.type != type) {
+      if (n == null) {
         // Shouldn't return lookup on type mismatch
+        return null;
+      } else if (n.type != type) {
+        System.err.println("miss match node type when getting node,");
+        System.err.println(String.format("id=%d, type=%d, type from sg=%d", id, type, n.type));
         return null;
       } else {
         return n.clone(); // return copy

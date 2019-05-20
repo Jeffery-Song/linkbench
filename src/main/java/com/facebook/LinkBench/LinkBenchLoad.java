@@ -333,12 +333,20 @@ public class LinkBenchLoad implements Runnable {
         logger.trace("id1 = " + id1 + " link_type = " + link_type +
                            " nlinks = " + nlinks);
       }
+      long constructTime = 0;
+      long loadTime = 0;
+      long constructCount = 0;
+      long loadCount = 0;
       for (long j = 0; j < nlinks; j++) {
         if (bulkLoad) {
           // Can't reuse link object
           link = initLink();
         }
+        long ts1 = System.nanoTime();
         constructLink(rng, link, id1, link_type, j, singleAssoc);
+        long ts2 = System.nanoTime();
+        constructTime += ts2 - ts1;
+        constructCount += 1;
 
         if (bulkLoad) {
           loadBuffer.add(link);
@@ -358,7 +366,21 @@ public class LinkBenchLoad implements Runnable {
             count.version = link.version;
           }
         } else {
+          ts1 = System.nanoTime();
           loadLink(link, j, nlinks, singleAssoc);
+          ts2 = System.nanoTime();
+          loadTime += ts2 - ts1;
+          loadCount += 1;
+        }
+        if (constructCount % 10000 == 0 && constructCount != 0 && 
+            loadCount % 10000 == 0 && loadCount != 0) {
+          logger.info("id1 = " + id1 + " nlinks = " + nlinks + " j = " + j + 
+            " average cons time = " + (constructTime / constructCount) +
+            " average load time = " + (loadTime / loadCount));
+          constructCount = 0;
+          constructTime = 0;
+          loadCount = 0;
+          loadTime = 0;
         }
       }
 

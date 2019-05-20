@@ -36,6 +36,7 @@ import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
 import com.facebook.LinkBench.util.ClassLoadUtil;
+import com.facebook.LinkBench.measurements.Measurements;
 
 
 public class LinkBenchRequest implements Runnable {
@@ -147,6 +148,8 @@ public class LinkBenchRequest implements Runnable {
   long numnotfound = 0;
   long numHistoryQueries = 0;
 
+  Measurements _measurements;
+
   /**
    * Random number generator use for generating workload.  If
    * initialized with same seed, should generate same sequence of requests
@@ -246,6 +249,7 @@ public class LinkBenchRequest implements Runnable {
                         Config.PR_GETLINKLIST_HISTORY, 0.0) / 100;
 
     lastNodeId = startid1;
+    _measurements=Measurements.getMeasurements();
   }
 
   private void initRequestProbabilities(Properties props) {
@@ -502,6 +506,8 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("addLink id1=" + link.id1 + " link_type="
                     + link.link_type + " id2=" + link.id2 + " added=" + added);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_deletelink) {
         type = LinkBenchOp.DELETE_LINK;
         long id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
@@ -516,6 +522,8 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("deleteLink id1=" + id1 + " link_type=" + link_type
                      + " id2=" + id2);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_updatelink) {
         type = LinkBenchOp.UPDATE_LINK;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
@@ -538,6 +546,8 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("updateLink id1=" + link.id1 + " link_type="
                 + link.link_type + " id2=" + link.id2 + " found=" + found);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_countlink) {
 
         type = LinkBenchOp.COUNT_LINK;
@@ -551,6 +561,8 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("countLink id1=" + id1 + " link_type=" + link_type
                      + " count=" + count);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_getlink) {
 
         type = LinkBenchOp.MULTIGET_LINK;
@@ -574,6 +586,8 @@ public class LinkBenchRequest implements Runnable {
         } else {
           numnotfound += nid2s - found;
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
 
       } else if (r <= pc_getlinklist) {
 
@@ -582,7 +596,9 @@ public class LinkBenchRequest implements Runnable {
 
         if (rng.nextDouble() < p_historical_getlinklist &&
                     !this.listTailHistory.isEmpty()) {
+          // Get linklist tail is not counted??
           links = getLinkListTail();
+          // System.err.println("getlinklist tail");
         } else {
           long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
           long link_type = id2chooser.chooseRandomLinkType(rng);
@@ -590,10 +606,13 @@ public class LinkBenchRequest implements Runnable {
           links = getLinkList(id1, link_type);
           endtime = System.nanoTime();
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), links == null?1:0);
 
-        int count = ((links == null) ? 0 : links.length);
-        if (recordStats) {
-          stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
+        // int count = ((links == null) ? 0 : links.length);
+        if (recordStats && links != null) {
+          // stats.addStats(LinkBenchOp.RANGE_SIZE, count, false);
+          _measurements.measure("LinkRangeSize", links.length);
         }
       } else if (r <= pc_addnode) {
         type = LinkBenchOp.ADD_NODE;
@@ -604,6 +623,8 @@ public class LinkBenchRequest implements Runnable {
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("addNode " + newNode);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_updatenode) {
         type = LinkBenchOp.UPDATE_NODE;
         // Choose an id that has previously been created (but might have
@@ -620,6 +641,8 @@ public class LinkBenchRequest implements Runnable {
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("updateNode " + newNode + " changed=" + changed);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_deletenode) {
         type = LinkBenchOp.DELETE_NODE;
         long idToDelete = chooseRequestID(DistributionType.NODE_DELETES,
@@ -632,6 +655,8 @@ public class LinkBenchRequest implements Runnable {
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
           logger.trace("deleteNode " + idToDelete + " deleted=" + deleted);
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_getnode) {
         type = LinkBenchOp.GET_NODE;
         starttime = System.nanoTime();
@@ -647,6 +672,8 @@ public class LinkBenchRequest implements Runnable {
             logger.trace("getNode " + fetched);
           }
         }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
       } else {
         logger.error("No-op in requester: last probability < 1.0");
         return false;
@@ -663,11 +690,24 @@ public class LinkBenchRequest implements Runnable {
       }
 
       return true;
+    } catch (ConflictException e) {
+      long endtime2 = System.nanoTime();
+      long timetaken2 = (endtime2 - starttime)/1000;
+      _measurements.measure(type.displayName(), timetaken2);
+      _measurements.reportReturnCode(type.displayName(), 1);
+      if (recordStats) {
+        stats.addStats(type, timetaken2, true);
+      }
+      linkStore.clearErrors(requesterID);
+      return false;
+
     } catch (Throwable e){//Catch exception if any
 
       long endtime2 = System.nanoTime();
 
       long timetaken2 = (endtime2 - starttime)/1000;
+      _measurements.measure(type.displayName(), timetaken2);
+      _measurements.reportReturnCode(type.displayName(), 2);
 
       logger.error(type.displayName() + " error " +
                          e.getMessage(), e);
@@ -839,7 +879,7 @@ public class LinkBenchRequest implements Runnable {
 
     // Do final update of statistics
     progressTracker.update(requestsSinceLastUpdate);
-    displayStats(lastStatDisplay_ms, System.currentTimeMillis());
+    // displayStats(lastStatDisplay_ms, System.currentTimeMillis());
 
     // Report final stats
     logger.info("ThreadID = " + requesterID +
@@ -881,6 +921,7 @@ public class LinkBenchRequest implements Runnable {
 
   Link[] getLinkList(long id1, long link_type) throws Exception {
     Link links[] = linkStore.getLinkList(dbid, id1, link_type);
+    if (links == null) {return null;}
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
        logger.trace("getLinkList(id1=" + id1 + ", link_type="  + link_type
                      + ") => count=" + (links == null ? 0 : links.length));
@@ -908,6 +949,7 @@ public class LinkBenchRequest implements Runnable {
     Link links[] = linkStore.getLinkList(dbid, prevLast.id1,
         prevLast.link_type, 0, prevLast.time, 1, linkStore.getRangeLimit());
 
+    if (links == null) {return null;}
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("getLinkListTail(id1=" + prevLast.id1 + ", link_type="
                 + prevLast.link_type + ", max_time=" + prevLast.time
@@ -1029,7 +1071,7 @@ public class LinkBenchRequest implements Runnable {
         float elapsed_s = ((float) elapsed) / 1000;
         float limitPercent = (elapsed_s / ((float) timeLimit_s)) * 100;
         float rate = curr / ((float)elapsed_s);
-        progressLogger.info(String.format(
+        System.err.println(String.format(
             "%d/%d requests finished: %.1f%% complete at %.1f ops/sec" +
             " %.1f/%d secs elapsed: %.1f%% of time limit used",
             curr, totalRequests, progressPercent, rate,

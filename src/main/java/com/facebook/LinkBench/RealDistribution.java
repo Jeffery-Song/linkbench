@@ -122,6 +122,7 @@ public class RealDistribution extends PiecewiseLinearDistribution {
   public void init(Properties props, long min, long max,
                                               DistributionType type) {
     loadOneShot(props);
+    // logger.info("RealDistribution:using distribution type:" + type);
     switch (type) {
     case LINKS:
       init(min, max, nlinks_cdf, null, null, nlinks_expected_val);
@@ -299,8 +300,10 @@ public class RealDistribution extends PiecewiseLinearDistribution {
     while (scanner.hasNext()) {
       String type = scanner.next();
       if (type.equals("nlinks")) {
+        logger.info("loading nlinks cdf from " + fileAbsPath);
         nlinks_cdf = readCDF(fileAbsPath, scanner);
         nlinks_expected_val = expectedValue(nlinks_cdf);
+        logger.info("nlinks expected avg is " + nlinks_expected_val);
       }
       else if (type.equals("link_nreads")) {
         link_nreads_cdf = readCDF(fileAbsPath, scanner);

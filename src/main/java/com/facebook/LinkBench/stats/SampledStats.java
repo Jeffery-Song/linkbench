@@ -187,6 +187,7 @@ public class SampledStats {
                      " ops = " + opsSinceReset[type.ordinal()] +
                      " sampleDuration = " + sampleDuration + "ms" +
                      " samples = " + elems +
+                     "\n\t\t\t\t\t\t" + 
                      " mean = " + df.format(mean) +
                      " min = " + min +
                      " 25% = " + p25 +

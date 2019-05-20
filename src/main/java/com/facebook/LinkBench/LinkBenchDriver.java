@@ -50,6 +50,12 @@ import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
 import com.facebook.LinkBench.util.ClassLoadUtil;
 
+import com.facebook.LinkBench.measurements.Measurements;
+import com.facebook.LinkBench.measurements.exporter.MeasurementsExporter;
+import com.facebook.LinkBench.measurements.exporter.TextMeasurementsExporter;
+
+import java.io.OutputStream;
+
 /*
  LinkBenchDriver class.
  First loads data using multi-threaded LinkBenchLoad class.
@@ -238,7 +244,8 @@ public class LinkBenchDriver {
     int nTotalLoaders = genNodes ? nLinkLoaders + 1 : nLinkLoaders;
 
     LatencyStats latencyStats = new LatencyStats(nTotalLoaders);
-    List<Runnable> loaders = new ArrayList<Runnable>(nTotalLoaders);
+    List<Runnable> loaders = new ArrayList<Runnable>(nLinkLoaders);
+    List<Runnable> nodeloaders = new ArrayList<Runnable>(1);
 
     LoadProgress loadTracker = LoadProgress.create(logger, props);
     for (int i = 0; i < nLinkLoaders; i++) {
@@ -255,14 +262,18 @@ public class LinkBenchDriver {
       int loaderId = nTotalLoaders - 1;
       NodeStore nodeStore = createNodeStore(null);
       Random rng = new Random(masterRandom.nextLong());
-      loaders.add(new NodeLoader(props, logger, nodeStore, rng,
+      nodeloaders.add(new NodeLoader(props, logger, nodeStore, rng,
           latencyStats, csvStreamFile, loaderId));
     }
     enqueueLoadWork(chunk_q, startid1, maxid1, nLinkLoaders,
                     new Random(masterRandom.nextLong()));
     // run loaders
     loadTracker.startTimer();
-    long loadTime = concurrentExec(loaders);
+    long loadTime = 0;
+    if (genNodes) {
+      loadTime += concurrentExec(nodeloaders);
+    }
+    loadTime += concurrentExec(loaders);
 
     long expectedNodes = maxid1 - startid1;
     long actualLinks = 0;
@@ -396,15 +407,15 @@ public class LinkBenchDriver {
       }
     }
 
-    latencyStats.displayLatencyStats();
+    // latencyStats.displayLatencyStats();
 
     if (csvStatsFile != null) {
       latencyStats.printCSVStats(csvStatsFile, true);
     }
-
-    logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
-                 " requests done in " + (benchmarkTime/1000) + " seconds." +
-                 " Requests/second = " + (1000*requestsdone)/benchmarkTime);
+    exportMeasurements(props, requestsdone, benchmarkTime);
+    // logger.info("REQUEST PHASE COMPLETED. " + requestsdone +
+    //              " requests done in " + (benchmarkTime/1000) + " seconds." +
+    //              " Requests/second = " + (1000*requestsdone)/benchmarkTime);
     if (abortedRequesters > 0) {
       logger.error(String.format("Benchmark did not complete cleanly: %d/%d " +
           "request threads aborted.  See error log entries for details.",
@@ -450,6 +461,49 @@ public class LinkBenchDriver {
     long endTime = System.currentTimeMillis();
     return endTime - startTime.get();
   }
+  private static void exportMeasurements(Properties props, long opcount, long runtime)
+      throws IOException {
+    // runtime should be ms
+    MeasurementsExporter exporter = null;
+    try
+    {
+      // if no destination file is provided the results will be written to stdout
+      OutputStream out;
+      String exportFile = props.getProperty("exportfile");
+      if (exportFile == null)
+      {
+        out = System.out;
+      } else
+      {
+        out = new FileOutputStream(exportFile);
+      }
+
+      // if no exporter is provided the default text one will be used
+      String exporterStr = props.getProperty("exporter", "com.facebook.LinkBench.measurements.exporter.TextMeasurementsExporter");
+      try
+      {
+        exporter = (MeasurementsExporter) Class.forName(exporterStr).getConstructor(OutputStream.class).newInstance(out);
+      } catch (Exception e)
+      {
+        System.err.println("Could not find exporter " + exporterStr
+            + ", will use default text reporter.");
+        e.printStackTrace();
+        exporter = new TextMeasurementsExporter(out);
+      }
+
+      exporter.write("OVERALL", "RunTime(ms)", runtime);
+      double throughput = 1000.0 * ((double) opcount) / ((double) runtime);
+      exporter.write("OVERALL", "Throughput(ops/sec)", throughput);
+
+      Measurements.getMeasurements().exportMeasurements(exporter);
+    } finally
+    {
+      if (exporter != null)
+      {
+        exporter.close();
+      }
+    }
+  }
 
   void drive() throws IOException, InterruptedException, Throwable {
     load();
@@ -461,6 +515,7 @@ public class LinkBenchDriver {
     processArgs(args);
     LinkBenchDriver d = new LinkBenchDriver(configFile,
                                 cmdLineProps, logFile);
+    Measurements.setProperties(d.props);
     try {
       d.drive();
     } catch (LinkBenchConfigError e) {

@@ -96,11 +96,15 @@ public class ID2Chooser {
    */
   public long chooseForLoad(Random rng, long id1, long link_type,
                                                   long outlink_ix) {
+    long ret;
     if (randomid2max == 0) {
-      return id1 + outlink_ix;
+      ret = id1 + outlink_ix;
+    } else if (randomid2max == 1) {
+      ret = 1;
     } else {
-      return rng.nextInt((int)randomid2max);
+      ret = rng.nextInt((int)randomid2max - 1) + 1;
     }
+    return ret;
   }
 
   /**
@@ -190,15 +194,18 @@ public class ID2Chooser {
     long id2;
     if (randomid2max == 0) {
       id2 = id1 + rng.nextInt((int)range);
+    }else if (randomid2max == 1) {
+      id2 = 1;
     } else {
-      id2 = rng.nextInt((int)randomid2max);
+      id2 = rng.nextInt((int)randomid2max - 1) + 1;
     }
-
     if (id2gen_config == 1) {
-      return fixId2(id2, nrequesters, requesterID, randomid2max);
-    } else {
-      return id2;
+      id2 = fixId2(id2, nrequesters, requesterID, randomid2max);
     }
+    if (id2 == 0) {
+      System.err.println("Sorry! mistakenly generated id2=0");
+    }
+    return id2;
   }
 
   public boolean sameShuffle;

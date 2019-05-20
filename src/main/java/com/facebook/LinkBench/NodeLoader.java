@@ -142,6 +142,9 @@ public class NodeLoader implements Runnable {
       if (lastDisplayTime_ms + displayFreq_ms <= now) {
         displayAndResetStats();
       }
+      if (id % 100000 == 0 && id != 0) {
+        logger.info("Loading of nodes " + id + "/" + totalNodes + " done");
+      }
     }
     // Load any remaining data
     loadNodes(nodeLoadBuffer);

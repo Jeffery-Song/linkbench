@@ -737,7 +737,7 @@ public class LinkStoreMysql extends GraphStore {
                          " is " + count);
     }
     if (count == 0) {
-      return null;
+      return new Link[0];
     }
 
     // Fetch the link data
