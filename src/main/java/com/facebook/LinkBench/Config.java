@@ -87,7 +87,7 @@ public class Config {
   public static final String WRITE_FUNCTION = "write_function";
   public static final String WRITE_CONFIG = "write_config";
   public static final String READ_UNCORR_CONFIG_PREFIX = "read_uncorr_";
-  public static final String WRITE_UNCORR_CONFIG_PREFIX = "read_uncorr_";
+  public static final String WRITE_UNCORR_CONFIG_PREFIX = "write_uncorr_";
   public static final String READ_UNCORR_FUNCTION = READ_UNCORR_CONFIG_PREFIX
                                                     + ACCESS_FUNCTION_SUFFIX;
   public static final String WRITE_UNCORR_FUNCTION = WRITE_UNCORR_CONFIG_PREFIX
