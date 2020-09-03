@@ -38,6 +38,9 @@ public abstract class LinkStore {
   /** Controls the current setting for range limit */
   protected int rangeLimit;
 
+  public int getRetries() {
+    return 0;
+  }
   /** The default constructor */
   public LinkStore() {
     this.rangeLimit = DEFAULT_LIMIT;

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -843,6 +844,7 @@ public class LinkBenchRequest implements Runnable {
         requestsDone++;
         requestsSinceLastUpdate++;
         if (requestsSinceLastUpdate >= RequestProgress.THREAD_REPORT_INTERVAL) {
+          progressTracker.addRetries(linkStore.getRetries());
           progressTracker.update(requestsSinceLastUpdate);
           requestsSinceLastUpdate = 0;
         }
@@ -1052,6 +1054,7 @@ public class LinkBenchRequest implements Runnable {
 
     private long totalRequests;
     private final AtomicLong requestsDone;
+    private final AtomicInteger retries;
 
     private long benchmarkStartTime;
     private long last_update_time;
@@ -1068,6 +1071,7 @@ public class LinkBenchRequest implements Runnable {
       this.progressLogger = progressLogger;
       this.totalRequests = totalRequests;
       this.requestsDone = new AtomicLong();
+      this.retries = new AtomicInteger();
       this.timeLimit_s = timeLimit_s;
       this.warmupTime_s = warmupTime_s;
       this.last_update_done = 0;
@@ -1088,6 +1092,10 @@ public class LinkBenchRequest implements Runnable {
       return benchmarkStartTime;
     }
 
+    public void addRetries(int retry) {
+      retries.addAndGet(retry);
+    }
+
     public void update(long requestIncr) {
       long curr = requestsDone.addAndGet(requestIncr);
       long prev = curr - requestIncr;
@@ -1103,8 +1111,8 @@ public class LinkBenchRequest implements Runnable {
           float slot_sec = (now - last_update_time)/(float)1000;
           float latest_tp = (curr - last_update_done)/(float)slot_sec;
           System.err.println(String.format(
-              "%.1f/%d duration, %d done, total tp: %.1f ops/sec; tp of last %.1fs: %.1f ops/sec",
-              elapsed_s, duration, curr, rate, slot_sec, latest_tp));
+              "%.1f/%d duration, %d done, total tp: %.1f ops/sec; tp of last %.1fs: %.1f ops/sec, aborts is %d",
+              elapsed_s, duration, curr, rate, slot_sec, latest_tp, retries.get()));
         } else {
           System.err.println(String.format(
               "%d/%d requests finished: %.1f%% complete at %.1f ops/sec; tp of last 1s: %.1f ops/sec" +
@@ -1128,8 +1136,8 @@ public class LinkBenchRequest implements Runnable {
         float slot_sec = (now - last_update_time)/(float)1000;
         float latest_tp = (curr - last_update_done)/(float)slot_sec;
         System.err.println(String.format(
-            "%.1f/%d duration, %d done, total tp: %.1f ops/sec; tp of last %.1fs: %.1f ops/sec",
-            elapsed_s, duration, curr, rate, slot_sec, latest_tp));
+            "%.1f/%d duration, %d done, total tp: %.1f ops/sec; tp of last %.1fs: %.1f ops/sec, aborts is %d",
+            elapsed_s, duration, curr, rate, slot_sec, latest_tp, retries.get()));
       } else {
         System.err.println(String.format(
             "%d/%d requests finished: %.1f%% complete at %.1f ops/sec; tp of last 1s: %.1f ops/sec" +

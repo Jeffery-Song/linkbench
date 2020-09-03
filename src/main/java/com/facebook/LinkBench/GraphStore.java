@@ -33,4 +33,7 @@ public abstract class GraphStore extends LinkStore implements NodeStore {
     }
     return ids;
   }
+  public int getRetries() {
+    return 0;
+  }
 }
