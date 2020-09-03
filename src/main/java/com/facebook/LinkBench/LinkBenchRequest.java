@@ -709,13 +709,24 @@ public class LinkBenchRequest implements Runnable {
       linkStore.clearErrors(requesterID);
       return false;
 
+    } catch (MissingException e) {
+      long endtime2 = System.nanoTime();
+      long timetaken2 = (endtime2 - starttime)/1000;
+      _measurements.measure(type.displayName(), timetaken2);
+      _measurements.reportReturnCode(type.displayName(), 2);
+      if (recordStats) {
+        stats.addStats(type, timetaken2, true);
+      }
+      linkStore.clearErrors(requesterID);
+      return false;
+
     } catch (Throwable e){//Catch exception if any
 
       long endtime2 = System.nanoTime();
 
       long timetaken2 = (endtime2 - starttime)/1000;
       _measurements.measure(type.displayName(), timetaken2);
-      _measurements.reportReturnCode(type.displayName(), 2);
+      _measurements.reportReturnCode(type.displayName(), 3);
 
       logger.error(type.displayName() + " error " +
                          e.getMessage(), e);
