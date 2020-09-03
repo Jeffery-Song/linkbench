@@ -48,6 +48,9 @@ public class ID2Chooser {
   private final long startid1;
   private long maxid1;
 
+  /** if ture, always generate id2 smaller than id1 in load phase */
+  private final boolean id2lessthanid1;
+
   /** if > 0, choose id2s in range [startid1, randomid2max) */
   private final long randomid2max;
 
@@ -73,6 +76,8 @@ public class ID2Chooser {
     this.nrequesters = nrequesters;
     this.requesterID = requesterID;
 
+    id2lessthanid1 = ConfigUtil.getBool(props, Config.LOAD_ID2_LESS_THAN_ID1, false);
+
     // random number generator for id2
     randomid2max = ConfigUtil.getLong(props, Config.RANDOM_ID2_MAX, 0L);
 
@@ -97,6 +102,12 @@ public class ID2Chooser {
   public long chooseForLoad(Random rng, long id1, long link_type,
                                                   long outlink_ix) {
     long ret;
+    if (id2lessthanid1) {
+      assert(id1 > startid1);
+      if (id1 == startid1 + 1) ret = startid1;
+      else ret = rng.nextInt((int)id1-2)+1;
+      return ret;
+    }
     if (randomid2max == 0) {
       ret = id1 + outlink_ix;
     } else if (randomid2max == 1) {
@@ -217,6 +228,9 @@ public class ID2Chooser {
    */
   public long calcTotalLinkCount(long id1) {
     assert(id1 >= startid1 && id1 < maxid1);
+    if (id2lessthanid1 && id1 == startid1) {
+      return 0;
+    }
     // Shuffle.  A low id after shuffling means many links, a high means few
     long shuffled;
     if (linkDist.doShuffle()) {
