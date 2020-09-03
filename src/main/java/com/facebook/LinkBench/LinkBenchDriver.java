@@ -406,6 +406,7 @@ public class LinkBenchDriver {
         abortedRequesters++;
       }
     }
+    progress.force_print();
 
     // latencyStats.displayLatencyStats();
 

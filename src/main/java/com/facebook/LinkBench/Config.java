@@ -114,6 +114,8 @@ public class Config {
   public static final String MAX_TIME = "maxtime";
   public static final String REQUEST_RATE = "requestrate";
   public static final String NUM_REQUESTS = "requests";
+  public static final String USE_DURATION = "use_duration";
+  public static final String DURATION = "duration";
   public static final String MAX_FAILED_REQUESTS = "max_failed_requests";
   public static final String ID2GEN_CONFIG = "id2gen_config";
   public static final String LINK_MULTIGET_DIST = "link_multiget_dist";

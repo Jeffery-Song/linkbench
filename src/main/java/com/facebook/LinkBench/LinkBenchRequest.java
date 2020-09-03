@@ -40,12 +40,17 @@ import com.facebook.LinkBench.measurements.Measurements;
 
 
 public class LinkBenchRequest implements Runnable {
+  private static long start_time;
+
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   Properties props;
   LinkStore linkStore;
   NodeStore nodeStore;
 
   RequestProgress progressTracker;
+
+  boolean use_duration;
+  int duration;
 
   long numRequests;
   /** Requests per second: <= 0 for unlimited rate */
@@ -203,6 +208,8 @@ public class LinkBenchRequest implements Runnable {
     debuglevel = ConfigUtil.getDebugLevel(props);
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
     numRequests = ConfigUtil.getLong(props, Config.NUM_REQUESTS);
+    use_duration = ConfigUtil.getBool(props, Config.USE_DURATION, true);
+    duration = ConfigUtil.getInt(props, Config.DURATION, 30);
     requestrate = ConfigUtil.getLong(props, Config.REQUEST_RATE, 0L);
     maxFailedRequests = ConfigUtil.getLong(props,  Config.MAX_FAILED_REQUESTS, 0L);
     warmupTime = Math.max(0, ConfigUtil.getLong(props, Config.WARMUP_TIME, 0L));
@@ -806,7 +813,15 @@ public class LinkBenchRequest implements Runnable {
     long lastStatDisplay_ms = curTime;
     long reqTime_ns = System.nanoTime();
     double requestrate_ns = ((double)requestrate)/1e9;
-    while (requestsDone < numRequests) {
+    
+    // long start_time = System.currentTimeMillis();
+    while (true) {
+      if (use_duration) {
+        long sec = (System.currentTimeMillis() - start_time) / 1000L;
+        if (sec >= duration) break;
+      } else if (requestsDone < numRequests) {
+        break;
+      }
       if (requestrate > 0) {
         reqTime_ns = Timer.waitExpInterval(rng, reqTime_ns, requestrate_ns);
       }
@@ -1039,8 +1054,13 @@ public class LinkBenchRequest implements Runnable {
     private final AtomicLong requestsDone;
 
     private long benchmarkStartTime;
+    private long last_update_time;
+    private long last_update_done;
     private long warmupTime_s;
     private long timeLimit_s;
+
+    private boolean use_duration = false;
+    private int duration = 0;
 
     public RequestProgress(Logger progressLogger, long totalRequests,
                             long timeLimit_s, long warmupTime_s, long interval) {
@@ -1050,10 +1070,18 @@ public class LinkBenchRequest implements Runnable {
       this.requestsDone = new AtomicLong();
       this.timeLimit_s = timeLimit_s;
       this.warmupTime_s = warmupTime_s;
+      this.last_update_done = 0;
+    }
+
+    public void setUseDuration(int d) {
+      use_duration = true;
+      duration = d;
     }
 
     public void startTimer() {
       benchmarkStartTime = System.currentTimeMillis() + warmupTime_s * 1000;
+      last_update_time = benchmarkStartTime;
+      LinkBenchRequest.start_time = benchmarkStartTime;
     }
 
     public long getBenchmarkStartTime() {
@@ -1071,13 +1099,46 @@ public class LinkBenchRequest implements Runnable {
         float elapsed_s = ((float) elapsed) / 1000;
         float limitPercent = (elapsed_s / ((float) timeLimit_s)) * 100;
         float rate = curr / ((float)elapsed_s);
-        System.err.println(String.format(
-            "%d/%d requests finished: %.1f%% complete at %.1f ops/sec" +
-            " %.1f/%d secs elapsed: %.1f%% of time limit used",
-            curr, totalRequests, progressPercent, rate,
-            elapsed_s, timeLimit_s, limitPercent));
-
+        if (use_duration) {
+          float slot_sec = (now - last_update_time)/(float)1000;
+          float latest_tp = (curr - last_update_done)/(float)slot_sec;
+          System.err.println(String.format(
+              "%.1f/%d duration, %d done, total tp: %.1f ops/sec; tp of last %.1fs: %.1f ops/sec",
+              elapsed_s, duration, curr, rate, slot_sec, latest_tp));
+        } else {
+          System.err.println(String.format(
+              "%d/%d requests finished: %.1f%% complete at %.1f ops/sec; tp of last 1s: %.1f ops/sec" +
+              " %.1f/%d secs elapsed: %.1f%% of time limit used",
+              curr, totalRequests, progressPercent, rate, (curr - last_update_done)/((now - last_update_time)/1000.0),
+              elapsed_s, timeLimit_s, limitPercent));
+        }
+        last_update_time = now;
+        last_update_done = curr;
       }
+    }
+    public void force_print() {
+      long curr = requestsDone.get();
+      float progressPercent = ((float) curr) / totalRequests * 100;
+      long now = System.currentTimeMillis();
+      long elapsed = now - benchmarkStartTime;
+      float elapsed_s = ((float) elapsed) / 1000;
+      float limitPercent = (elapsed_s / ((float) timeLimit_s)) * 100;
+      float rate = curr / ((float)elapsed_s);
+      if (use_duration) {
+        float slot_sec = (now - last_update_time)/(float)1000;
+        float latest_tp = (curr - last_update_done)/(float)slot_sec;
+        System.err.println(String.format(
+            "%.1f/%d duration, %d done, total tp: %.1f ops/sec; tp of last %.1fs: %.1f ops/sec",
+            elapsed_s, duration, curr, rate, slot_sec, latest_tp));
+      } else {
+        System.err.println(String.format(
+            "%d/%d requests finished: %.1f%% complete at %.1f ops/sec; tp of last 1s: %.1f ops/sec" +
+            " %.1f/%d secs elapsed: %.1f%% of time limit used",
+            curr, totalRequests, progressPercent, rate, (curr - last_update_done)/((now - last_update_time)/1000.0),
+            elapsed_s, timeLimit_s, limitPercent));
+      }
+      last_update_time = now;
+      last_update_done = curr;
     }
   }
 
@@ -1089,8 +1150,14 @@ public class LinkBenchRequest implements Runnable {
                                                10000L);
     long warmupTime = ConfigUtil.getLong(props, Config.WARMUP_TIME, 0L);
     long maxTime = ConfigUtil.getLong(props, Config.MAX_TIME);
-    return new RequestProgress(logger, total_requests,
+    boolean use_duration = ConfigUtil.getBool(props, Config.USE_DURATION, true);
+    int duration = ConfigUtil.getInt(props, Config.DURATION, 0);
+    RequestProgress rp = new RequestProgress(logger, total_requests,
               maxTime, warmupTime, progressInterval);
+    if (use_duration) {
+      rp.setUseDuration(duration);
+    }
+    return rp;
   }
 }
 
