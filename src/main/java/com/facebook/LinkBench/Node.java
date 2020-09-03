@@ -22,6 +22,23 @@ import java.util.Arrays;
  * @author tarmstrong
  */
 public class Node {
+  private static String[] _fields = {"id", "type", "version", "time", "data"};
+  public static String[] fields() {
+    return _fields;
+  }
+  public static boolean fieldIsString(int idx) {
+    return idx == 4;
+  }
+  public Object getField(int idx) {
+    switch (idx) {
+      case 0: return id;
+      case 1: return type;
+      case 2: return version;
+      case 3: return time;
+      case 4: return data;
+      default: assert(false); return null;
+    }
+  }
   /** Unique identifier for node */
   public long id;
 

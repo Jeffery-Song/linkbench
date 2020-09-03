@@ -142,4 +142,7 @@ public class Config {
   /* External data */
   public static final String DISTRIBUTION_DATA_FILE = "data_file";
   public static final String WORKLOAD_CONFIG_FILE = "workload_file";
+
+  /** For ali workload */
+  public static final String LOAD_ID2_LESS_THAN_ID1 = "load_id2_less_than_id1";
 }

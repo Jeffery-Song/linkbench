@@ -19,6 +19,25 @@ import java.util.Arrays;
 
 
 public class Link {
+  private static String[] _fields = {"id1", "id2", "link_type", "visibility", "data", "version", "time"};
+  public static String[] fields() {
+    return _fields;
+  }
+  public static boolean fieldIsString(int idx) {
+    return idx == 4;
+  }
+  public Object getField(int idx) {
+    switch (idx) {
+      case 0: return id1;
+      case 1: return id2;
+      case 2: return link_type;
+      case 3: return visibility;
+      case 4: return data;
+      case 5: return version;
+      case 6: return time;
+      default: assert(false); return null;
+    }
+  }
 
   public Link(long id1, long link_type, long id2,
       byte visibility, byte[] data, int version, long time) {
