@@ -919,7 +919,7 @@ public class LinkStoreNeo4j extends GraphStore {
   }
   public static void main(String[] args) {
     String uri = "bolt://localhost:7687";
-    Driver driver = GraphDatabase.driver(uri, AuthTokens.basic("neo4j", "19971228"));
+    Driver driver = GraphDatabase.driver(uri, AuthTokens.basic("neo4j", "admin"));
     try (Session session = driver.session()) {
       session.writeTransaction(new TransactionWork<Void>() {
         @Override 

@@ -491,7 +491,7 @@ public class LinkBenchDriver {
         e.printStackTrace();
         exporter = new TextMeasurementsExporter(out);
       }
-
+      exporter.write("EXPORT TIME: " + java.time.LocalDateTime.now().toString(), "", 0);
       exporter.write("OVERALL", "RunTime(ms)", runtime);
       double throughput = 1000.0 * ((double) opcount) / ((double) runtime);
       exporter.write("OVERALL", "Throughput(ops/sec)", throughput);
