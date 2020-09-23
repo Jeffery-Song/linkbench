@@ -332,7 +332,7 @@ public class LinkStoreNeo4j extends GraphStore {
                   "type", l.link_type,
                   "id2", l.id2,
                   "visibility", (int)l.visibility,
-                  "data", l.data,
+                  "data", stringLiteral(l.data),
                   "time", l.time,
                   "version", l.version));
               // long ts1 = System.nanoTime();
@@ -416,7 +416,7 @@ public class LinkStoreNeo4j extends GraphStore {
                         "type", l.link_type,
                         "id2", l.id2,
                         "visibility", (int)l.visibility,
-                        "data", l.data,
+                        "data", stringLiteral(l.data),
                         "time", l.time,
                         "version", l.version));
                   }
@@ -688,7 +688,7 @@ public class LinkStoreNeo4j extends GraphStore {
                                               "type", node.type,
                                               "time", node.time,
                                               "version", node.version,
-                                              "data", node.data));
+                                              "data", stringLiteral(node.data)));
               return null;
             }
           });
@@ -722,7 +722,7 @@ public class LinkStoreNeo4j extends GraphStore {
         put("type", n.type);
         put("time", n.time);
         put("version", n.version);
-        put("data", n.data);
+        put("data", stringLiteral(n.data));
         put("valid", true);
       }});
     }
@@ -818,7 +818,7 @@ public class LinkStoreNeo4j extends GraphStore {
                                                                       "type", node.type,
                                                                       "time", node.time,
                                                                       "version", node.version,
-                                                                      "data", node.data));
+                                                                      "data", stringLiteral(node.data)));
               if (sr.hasNext() == false) return null;
               return sr.single().get(0).asInt();
             }
@@ -883,34 +883,34 @@ public class LinkStoreNeo4j extends GraphStore {
   private static String stringLiteral(byte arr[]) {
     CharBuffer cb = Charset.forName("ISO-8859-1").decode(ByteBuffer.wrap(arr));
     StringBuilder sb = new StringBuilder();
-    sb.append('\'');
+    // sb.append();
     for (int i = 0; i < cb.length(); i++) {
       char c = cb.get(i);
       switch (c) {
-        case '\'':
-          sb.append("\\'");
-          break;
-        case '\\':
-          sb.append("\\\\");
-          break;
-        case '\0':
-          sb.append("\\0");
-          break;
-        case '\b':
-          sb.append("\\b");
-          break;
-        case '\n':
-          sb.append("\\n");
-          break;
-        case '\r':
-          sb.append("\\r");
-          break;
-        case '\t':
-          sb.append("\\t");
-          break;
-        case '\f':
-          sb.append("\\f");
-          break;
+        // case '\'':
+        //   sb.append("\\'");
+        //   break;
+        // case '\\':
+        //   sb.append("\\\\");
+        //   break;
+        // case '\0':
+        //   sb.append("\\0");
+        //   break;
+        // case '\b':
+        //   sb.append("\\b");
+        //   break;
+        // case '\n':
+        //   sb.append("\\n");
+        //   break;
+        // case '\r':
+        //   sb.append("\\r");
+        //   break;
+        // case '\t':
+        //   sb.append("\\t");
+        //   break;
+        // case '\f':
+        //   sb.append("\\f");
+        //   break;
         default:
           // if (Character.getNumericValue(c) < 0) {
           //   // Fall back on hex string for values not defined in latin-1
@@ -920,7 +920,7 @@ public class LinkStoreNeo4j extends GraphStore {
           // }
       }
     }
-    sb.append('\'');
+    // sb.append('\'');
     return sb.toString();
   }
 
@@ -932,7 +932,7 @@ public class LinkStoreNeo4j extends GraphStore {
    */
   private static String hexStringLiteral(byte[] arr) {
     StringBuilder sb = new StringBuilder();
-    sb.append("x'");
+    // sb.append("x'");
     for (int i = 0; i < arr.length; i++) {
       byte b = arr[i];
       int lo = b & 0xf;
@@ -940,7 +940,7 @@ public class LinkStoreNeo4j extends GraphStore {
       sb.append(Character.forDigit(hi, 16));
       sb.append(Character.forDigit(lo, 16));
     }
-    sb.append("'");
+    // sb.append("'");
     return sb.toString();
   }
   public static void main(String[] args) {

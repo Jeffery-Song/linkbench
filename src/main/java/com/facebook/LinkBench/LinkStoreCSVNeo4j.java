@@ -163,11 +163,11 @@ public class LinkStoreCSVNeo4j extends GraphStore {
       if (l.link_type != 123456789) System.err.println("We hanve more than one link type");
       if (Link.fields()[i].equals("id1")) continue;
       if (Link.fields()[i].equals("id2")) continue;
-      if (Link.fields()[i].equals("link_type")) continue;
+      // if (Link.fields()[i].equals("link_type")) continue;
       if (Link.fieldIsString(i)) 
-        sb.append("|\"" + l.getField(i) + "\"");
+        sb.append("|\"" + stringLiteral((byte[])l.getField(i)) + "\"");
       else
-        sb.append("|" + l.getField(i));
+        sb.append("|" + l.getField(i).toString());
     }
     return sb.append("\n").toString();
   }
@@ -293,11 +293,11 @@ public class LinkStoreCSVNeo4j extends GraphStore {
     for (int i = 0; i < Node.fields().length; i++) {
       if (n.type != 2048) System.err.println("We hanve more than one node type");
       if (Node.fields()[i].equals("id")) continue;
-      if (Node.fields()[i].equals("type")) continue;
+      // if (Node.fields()[i].equals("type")) continue;
       if (Node.fieldIsString(i)) 
-        sb.append("|\"" + n.getField(i) + "\"");
+        sb.append("|\"" + stringLiteral((byte[])n.getField(i)) + "\"");
       else
-        sb.append("|" + n.getField(i));
+        sb.append("|" + n.getField(i).toString());
     }
     return sb.append("\n").toString();
   }
@@ -368,10 +368,12 @@ public class LinkStoreCSVNeo4j extends GraphStore {
   private static String stringLiteral(byte arr[]) {
     CharBuffer cb = Charset.forName("ISO-8859-1").decode(ByteBuffer.wrap(arr));
     StringBuilder sb = new StringBuilder();
-    sb.append('\'');
     for (int i = 0; i < cb.length(); i++) {
       char c = cb.get(i);
       switch (c) {
+        case '\"':
+          sb.append("\\\"");
+          break;
         case '\'':
           sb.append("\\'");
           break;
@@ -405,7 +407,6 @@ public class LinkStoreCSVNeo4j extends GraphStore {
           // }
       }
     }
-    sb.append('\'');
     return sb.toString();
   }
 
@@ -417,7 +418,6 @@ public class LinkStoreCSVNeo4j extends GraphStore {
    */
   private static String hexStringLiteral(byte[] arr) {
     StringBuilder sb = new StringBuilder();
-    sb.append("x'");
     for (int i = 0; i < arr.length; i++) {
       byte b = arr[i];
       int lo = b & 0xf;
@@ -425,7 +425,6 @@ public class LinkStoreCSVNeo4j extends GraphStore {
       sb.append(Character.forDigit(hi, 16));
       sb.append(Character.forDigit(lo, 16));
     }
-    sb.append("'");
     return sb.toString();
   }
   public static void main(String[] args) { }
