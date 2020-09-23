@@ -57,6 +57,7 @@ public class Measurements
 	}
 
 	HashMap<String,OneMeasurement> data;
+	HashMap<String,OneMeasurementPlot> plot_data;
 	// boolean histogram=true;
 	int measuretype = 0;
 	// 0 for histogram, 1 for time series, 2 for combine
@@ -69,6 +70,7 @@ public class Measurements
 	public Measurements(Properties props)
 	{
 		data=new HashMap<String,OneMeasurement>();
+		plot_data=new HashMap<String,OneMeasurementPlot>();
 		
 		_props=props;
 		String expected_type = _props.getProperty(MEASUREMENT_TYPE, MEASUREMENT_TYPE_DEFAULT);
@@ -118,6 +120,29 @@ public class Measurements
 			e.printStackTrace(System.out);
 		}
 	}
+	public synchronized void measure(String operation, long x, long y)
+	{
+		if (!plot_data.containsKey(operation))
+		{
+			synchronized(this)
+			{
+				if (!plot_data.containsKey(operation))
+				{
+					plot_data.put(operation,new OneMeasurementPlot(operation, _props));
+				}
+			}
+		}
+		try
+		{
+			plot_data.get(operation).measure(x, y);
+		}
+		catch (java.lang.ArrayIndexOutOfBoundsException e)
+		{
+			System.out.println("ERROR: java.lang.ArrayIndexOutOfBoundsException - ignoring and continuing");
+			e.printStackTrace();
+			e.printStackTrace(System.out);
+		}
+	}
 
       /**
        * Report a return code for a single DB operaiton.
@@ -149,6 +174,10 @@ public class Measurements
     {
       measurement.exportMeasurements(exporter);
     }
+    for (OneMeasurement measurement : plot_data.values())
+    {
+      measurement.exportMeasurements(exporter);
+    }
   }
 	
       /**
@@ -158,6 +187,10 @@ public class Measurements
 	{
 		String ret="";
 		for (OneMeasurement m : data.values())
+		{
+			ret+=m.getSummary()+" ";
+		}
+		for (OneMeasurement m : plot_data.values())
 		{
 			ret+=m.getSummary()+" ";
 		}

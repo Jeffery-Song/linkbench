@@ -49,9 +49,9 @@ public class OneMeasurementCombine extends OneMeasurement
 		public double average; 
 		public int count;
 	}
-	public static final String BUCKETS="histogram.buckets";
+	public static final String BUCKETS="combine.buckets";
 	public static final String BUCKETS_DEFAULT="1000";
-	public static final String GRANULARITY="timeseries.granularity";
+	public static final String GRANULARITY="combine.granularity";
 	
 	public static final String GRANULARITY_DEFAULT="1000";
 
@@ -139,6 +139,11 @@ public class OneMeasurementCombine extends OneMeasurement
 			returncodes.put(Icode,val);
 		}
 		returncodes.get(Icode)[0]++;
+	}
+
+	@Override
+	public synchronized void measure(long x, long y) {
+		System.out.println("illegal use of combined measurement: no measure on coordinate");
 	}
 
 

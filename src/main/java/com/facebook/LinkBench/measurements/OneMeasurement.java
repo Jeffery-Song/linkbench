@@ -43,6 +43,8 @@ public abstract class OneMeasurement {
 
 	public abstract void measure(long latency);
 
+	public abstract void measure(long x, long y);
+
 	public abstract String getSummary();
 
   /**

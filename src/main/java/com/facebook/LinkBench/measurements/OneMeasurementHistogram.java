@@ -80,6 +80,10 @@ public class OneMeasurementHistogram extends OneMeasurement
 		returncodes.get(Icode)[0]++;
 	}
 
+	@Override
+	public synchronized void measure(long x, long y) {
+		System.out.println("illegal use of combined measurement: no measure on coordinate");
+	}
 
 	/* (non-Javadoc)
 	 * @see com.yahoo.ycsb.OneMeasurement#measure(int)
