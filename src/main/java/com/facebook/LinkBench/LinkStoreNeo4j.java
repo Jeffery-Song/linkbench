@@ -98,6 +98,9 @@ public class LinkStoreNeo4j extends GraphStore {
   private static AtomicLong _nodeid;
 
   private Measurements _measurements = Measurements.getMeasurements();
+
+  private boolean use_given_path = false;
+
   private String add_link_query;
   private String add_node_query;
   private String get_link_list_query;
@@ -154,18 +157,6 @@ public class LinkStoreNeo4j extends GraphStore {
 
   public LinkStoreNeo4j(Properties props) throws IOException, Exception {
     super();
-    add_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_LINK_QUERY));
-    add_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_NODE_QUERY));
-    get_link_list_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_LINK_LIST_QUERY));
-    get_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_NODE_QUERY));
-    // update link is implemented by get link
-    // update_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_LINK_QUERY));
-    update_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY));
-    delete_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_QUERY));
-    delete_link_expunge_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_EXPUNGE_QUERY));
-    delete_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_NODE_QUERY));
-    multiget_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_MULTIGET_LINK_QUERY));
-    count_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_COUNT_LINK_QUERY));
     // template_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_template_QUERY));
     initialize(props, Phase.LOAD, 0);
   }
