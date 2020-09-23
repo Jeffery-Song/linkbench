@@ -55,6 +55,7 @@ import org.neo4j.driver.v1.Values;
 import org.neo4j.driver.v1.exceptions.TransientException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import com.facebook.LinkBench.measurements.Measurements;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -95,6 +96,7 @@ public class LinkStoreNeo4j extends GraphStore {
   private static String __sync = "";
   private static AtomicLong _nodeid;
 
+  private Measurements _measurements = Measurements.getMeasurements();
   private String add_link_query;
   private String add_node_query;
   private String get_link_list_query;
@@ -786,23 +788,28 @@ public class LinkStoreNeo4j extends GraphStore {
      * remove a.test 
      * return test
      */
+    long start_time = System.nanoTime();
     final String statement = update_node_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
         try {
-          return session.writeTransaction(new TransactionWork<Boolean>() {
+          int cnt;
+          cnt =  session.writeTransaction(new TransactionWork<Integer>() {
             @Override 
-            public Boolean execute(Transaction tx) {
+            public Integer execute(Transaction tx) {
               StatementResult sr = tx.run(statement, Values.parameters("id", node.id,
                                                                       "type", node.type,
                                                                       "time", node.time,
                                                                       "version", node.version,
                                                                       "data", node.data));
               if (sr.hasNext() == false) return null;
-              return sr.single().get(0).asBoolean();
+              return sr.single().get(0).asInt();
             }
           });
           // break;
+          long end_time = System.nanoTime();
+          _measurements.measure("count-time", cnt, (end_time - start_time)/1000);
+          return cnt > 0;
         } catch (TransientException e) {
           retries += 1;
           continue; // retry for deadlock

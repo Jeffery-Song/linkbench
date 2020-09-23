@@ -172,7 +172,9 @@ public class LinkStoreCCGraph extends GraphStore {
   }
   
   public boolean updateNode(String dbid, Node node) throws Exception {
+    long start_time = System.nanoTime();
     checkDBID(dbid);
+
     CallParam.Builder rqst = CallParam.newBuilder();
 
     rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.id)));
@@ -186,6 +188,14 @@ public class LinkStoreCCGraph extends GraphStore {
       // blockingStub.abort(txnidmsg);
       throw new Exception(String.format("Update node failed: (%d, %d)", node.id, node.type));
     }
+    long node_count = Long.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).longValue();
+    long end_time = System.nanoTime();
+    _measurements.measure("count-time", node_count, (end_time - start_time)/1000);
+    _measurements.measure("count-cctime", node_count, rply.getMeasure(1));
+    _measurements.measure("count-txntime", node_count, rply.getMeasure(2));
+    _measurements.measure("count-usedlock", node_count, rply.getMeasure(3)*1000);
+    _measurements.measure("count-blockedlock", node_count, rply.getMeasure(5)*1000);
+
     _measurements.measure("lock_block_time", rply.getMeasure(0));
     _measurements.measure("cc_time", rply.getMeasure(1));
     _measurements.measure("txn_time", rply.getMeasure(2));
@@ -196,7 +206,7 @@ public class LinkStoreCCGraph extends GraphStore {
     for (int i = 7; i < rply.getMeasureCount(); i++) {
       _measurements.measure("step["+(i-6)+"]", rply.getMeasure(i));
     }
-    _measurements.measure("node_count", Long.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).longValue()*1000);
+    _measurements.measure("node_count", node_count*1000);
     return rply.getCode().equals(Code.kOk);
   }
   public boolean deleteNode(String dbid, int type, long id) throws Exception {

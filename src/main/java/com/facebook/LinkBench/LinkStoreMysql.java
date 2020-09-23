@@ -31,8 +31,13 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import com.facebook.LinkBench.measurements.Measurements;
 
 public class LinkStoreMysql extends GraphStore {
 
@@ -43,10 +48,14 @@ public class LinkStoreMysql extends GraphStore {
   public static final String CONFIG_PASSWORD = "password";
   public static final String CONFIG_BULK_INSERT_BATCH = "mysql_bulk_insert_batch";
   public static final String CONFIG_DISABLE_BINLOG_LOAD = "mysql_disable_binlog_load";
+  public static final String CONFIG_UPDATE_NODE_QUERY = "mysql.update_node.sql";
 
   public static final int DEFAULT_BULKINSERT_SIZE = 1024;
 
   private static final boolean INTERNAL_TESTING = false;
+
+  private String update_node_query;
+  private Measurements _measurements = Measurements.getMeasurements();
 
   String linktable;
   String counttable;
@@ -81,8 +90,19 @@ public class LinkStoreMysql extends GraphStore {
     initialize(props, Phase.LOAD, 0);
   }
 
+  static private String loadFromFile(String filePath) {
+    try {
+      return new String(Files.readAllBytes(Paths.get(filePath)));
+    } catch (IOException e) {
+      assert(false);
+      return "";
+    }
+  }
+
   public void initialize(Properties props, Phase currentPhase,
     int threadId) throws IOException, Exception {
+    String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY);
+    update_node_query = loadFromFile(fname);
     counttable = ConfigUtil.getPropertyRequired(props, Config.COUNT_TABLE);
     if (counttable.equals("")) {
       String msg = "Error! " + Config.COUNT_TABLE + " is empty!"
@@ -1012,9 +1032,13 @@ public class LinkStoreMysql extends GraphStore {
 
   @Override
   public boolean updateNode(String dbid, Node node) throws Exception {
+    long start_time = System.nanoTime();
     while (true) {
       try {
-        return updateNodeImpl(dbid, node);
+        int cnt = updateNodeImpl(dbid, node);
+        long end_time = System.nanoTime();
+        _measurements.measure("count-time", cnt, (end_time - start_time)/1000);
+        return cnt>0;
       } catch (SQLException ex) {
         if (!processSQLException(ex, "updateNode")) {
           throw ex;
@@ -1023,12 +1047,16 @@ public class LinkStoreMysql extends GraphStore {
     }
   }
 
-  private boolean updateNodeImpl(String dbid, Node node) throws Exception {
+  private int updateNodeImpl(String dbid, Node node) throws Exception {
     checkNodeTableConfigured();
-    String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
-            " SET " + "version=" + node.version + ", time=" + node.time
-                   + ", data=" + stringLiteral(node.data) +
-            " WHERE id=" + node.id + " AND type=" + node.type + "; commit;";
+    // System.out.println(update_node_query);
+    String sql;
+    sql = update_node_query.replace("@id", String.valueOf(node.id));
+    // System.out.println(sql);
+    // String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
+    //         " SET " + "version=" + node.version + ", time=" + node.time
+    //                + ", data=" + stringLiteral(node.data) +
+    //         " WHERE id=" + node.id + " AND type=" + node.type + "; commit;";
 
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace(sql);
@@ -1036,10 +1064,13 @@ public class LinkStoreMysql extends GraphStore {
 
     int rows = stmt_rw.executeUpdate(sql);
 
-    if (rows == 1) return true;
-    else if (rows == 0) return false;
-    else throw new Exception("Did not expect " + rows +  "affected rows: only "
-        + "expected update to affect at most one row");
+    _measurements.measure("node_count", rows*1000);
+
+    // if (rows == 1) return true;
+    // else if (rows == 0) return false;
+    // else throw new Exception("Did not expect " + rows +  "affected rows: only "
+    //     + "expected update to affect at most one row");
+    return rows;
   }
 
   @Override
