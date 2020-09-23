@@ -49,11 +49,13 @@ public class LinkStoreMysql extends GraphStore {
   public static final String CONFIG_BULK_INSERT_BATCH = "mysql_bulk_insert_batch";
   public static final String CONFIG_DISABLE_BINLOG_LOAD = "mysql_disable_binlog_load";
   public static final String CONFIG_UPDATE_NODE_QUERY = "mysql.update_node.sql";
+  public static final String CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY = "mysql.update_node_given_path.sql";
 
   public static final int DEFAULT_BULKINSERT_SIZE = 1024;
 
   private static final boolean INTERNAL_TESTING = false;
 
+  private boolean use_given_path = false;
   private String update_node_query;
   private Measurements _measurements = Measurements.getMeasurements();
 
@@ -101,8 +103,17 @@ public class LinkStoreMysql extends GraphStore {
 
   public void initialize(Properties props, Phase currentPhase,
     int threadId) throws IOException, Exception {
-    String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY);
-    update_node_query = loadFromFile(fname);
+    use_given_path = ConfigUtil.getBool(props, "ali.request_via_explicit_path", false);
+    if (use_given_path) {
+      String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY);
+      update_node_query = loadFromFile(fname);
+      // System.err.println("loading from " + fname);
+    } else {
+      String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY);
+      update_node_query = loadFromFile(fname);
+      // System.err.println("loading from " + fname);
+    }
+    // System.err.println(update_node_query);
     counttable = ConfigUtil.getPropertyRequired(props, Config.COUNT_TABLE);
     if (counttable.equals("")) {
       String msg = "Error! " + Config.COUNT_TABLE + " is empty!"
@@ -1051,7 +1062,11 @@ public class LinkStoreMysql extends GraphStore {
     checkNodeTableConfigured();
     // System.out.println(update_node_query);
     String sql;
-    sql = update_node_query.replace("@id", String.valueOf(node.id));
+    if (use_given_path) {
+      sql = update_node_query.replace("@node_list", AliPath.pathstring.get((int)node.id));
+    } else {
+      sql = update_node_query.replace("@id", String.valueOf(node.id));
+    }
     // System.out.println(sql);
     // String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
     //         " SET " + "version=" + node.version + ", time=" + node.time

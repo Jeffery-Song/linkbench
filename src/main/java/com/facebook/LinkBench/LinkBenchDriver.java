@@ -33,6 +33,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Scanner;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -362,6 +363,29 @@ public class LinkBenchDriver {
     }
   }
 
+  void prepare_path() throws IOException {
+    boolean do_path = ConfigUtil.getBool(props, "ali.request_via_explicit_path", false);
+    if (!do_path) return;
+    String path_file = ConfigUtil.getPropertyRequired(props, "ali.path_file");
+    Scanner sc = new Scanner(new File(path_file));
+    int V = ConfigUtil.getInt(props, Config.RANDOM_ID2_MAX, 0) - 1;
+    AliPath.paths = new ArrayList<ArrayList<Integer>>(V + 1);
+    AliPath.paths.add(new ArrayList<Integer>());
+    AliPath.pathstring = new ArrayList<String>(V + 1);
+    AliPath.pathstring.add("");
+    for (int i = 1; i <= V; i++) {
+      AliPath.paths.add(new ArrayList<Integer>());
+      AliPath.pathstring.add("");
+      while(true) {
+        int id = sc.nextInt();
+        AliPath.paths.get(i).add(id);
+        if (id == i) break;
+        AliPath.pathstring.set(i, AliPath.pathstring.get(i) + String.valueOf(id) + ",");
+      }
+      AliPath.pathstring.set(i, AliPath.pathstring.get(i) + String.valueOf(i));
+    }
+  }
+
   void sendrequests() throws IOException, InterruptedException, Throwable {
 
     if (!doRequest) {
@@ -369,6 +393,8 @@ public class LinkBenchDriver {
       return;
     }
 
+    /** prepare the node to path list */
+    prepare_path();
     // config info for requests
     int nrequesters = ConfigUtil.getInt(props, Config.NUM_REQUESTERS);
     if (nrequesters == 0) {

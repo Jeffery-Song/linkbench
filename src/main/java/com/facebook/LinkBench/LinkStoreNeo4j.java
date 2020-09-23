@@ -80,12 +80,13 @@ public class LinkStoreNeo4j extends GraphStore {
   public static final String CONFIG_GET_LINK_LIST_QUERY = "neo4j.get_link_list.cypher";
   public static final String CONFIG_GET_NODE_QUERY = "neo4j.get_node.cypher";
   // public static final String CONFIG_UPDATE_LINK_QUERY = "neo4j.update_link.cypher";
-  public static final String CONFIG_UPDATE_NODE_QUERY = "neo4j.update_node.cypher";
   public static final String CONFIG_DELETE_LINK_QUERY = "neo4j.delete_link.cypher";
   public static final String CONFIG_DELETE_LINK_EXPUNGE_QUERY = "neo4j.delete_link_expunge.cypher";
   public static final String CONFIG_DELETE_NODE_QUERY = "neo4j.delete_node.cypher";
   public static final String CONFIG_MULTIGET_LINK_QUERY = "neo4j.multiget_link.cypher";
   public static final String CONFIG_COUNT_LINK_QUERY = "neo4j.count_link.cypher";
+  public static final String CONFIG_UPDATE_NODE_QUERY = "neo4j.update_node.cypher";
+  public static final String CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY = "neo4j.update_node_given_path.cypher";
 
   public static final int DEFAULT_BULKINSERT_SIZE = 20;
 
@@ -205,12 +206,24 @@ public class LinkStoreNeo4j extends GraphStore {
     get_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_NODE_QUERY));
     // update link is implemented by get link
     // update_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_LINK_QUERY));
-    update_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY));
     delete_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_QUERY));
     delete_link_expunge_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_EXPUNGE_QUERY));
     delete_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_NODE_QUERY));
     multiget_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_MULTIGET_LINK_QUERY));
     count_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_COUNT_LINK_QUERY));
+    use_given_path = ConfigUtil.getBool(props, "ali.request_via_explicit_path", false);
+    if (use_given_path) {
+      String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY);
+      update_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY));
+      // System.err.println("loading from " + fname);
+    } else {
+      String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY);
+      update_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY));
+      // System.err.println("loading from " + fname);
+    }
+
+    // update link is implemented by get link
+    // update_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_LINK_QUERY));
     // template_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_template_QUERY));
   
     host = ConfigUtil.getPropertyRequired(props, CONFIG_HOST);
@@ -794,6 +807,19 @@ public class LinkStoreNeo4j extends GraphStore {
       while (true) { // retry for deadlock
         try {
           int cnt;
+          if (use_given_path) {
+
+          cnt =  session.writeTransaction(new TransactionWork<Integer>() {
+            @Override 
+            public Integer execute(Transaction tx) {
+              StatementResult sr = tx.run(statement, Values.parameters("node_list", AliPath.paths.get((int)(node.id))));
+              if (sr.hasNext() == false) return null;
+              return sr.single().get(0).asInt();
+            }
+          });
+
+          } else {
+
           cnt =  session.writeTransaction(new TransactionWork<Integer>() {
             @Override 
             public Integer execute(Transaction tx) {
@@ -806,6 +832,8 @@ public class LinkStoreNeo4j extends GraphStore {
               return sr.single().get(0).asInt();
             }
           });
+
+          }
           // break;
           long end_time = System.nanoTime();
           _measurements.measure("count-time", cnt, (end_time - start_time)/1000);
