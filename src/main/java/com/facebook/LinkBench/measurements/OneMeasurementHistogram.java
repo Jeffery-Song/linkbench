@@ -144,6 +144,7 @@ public class OneMeasurementHistogram extends OneMeasurement
 
     for (int i=0; i<_buckets; i++)
     {
+      if (histogram[i] == 0) continue;
       exporter.write(getName(), Integer.toString(i), histogram[i]);
     }
     exporter.write(getName(), ">"+_buckets, histogramoverflow);
