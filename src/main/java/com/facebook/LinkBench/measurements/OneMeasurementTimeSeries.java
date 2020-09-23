@@ -103,6 +103,11 @@ public class OneMeasurementTimeSeries extends OneMeasurement
 	}
 	
 	@Override
+	public synchronized void measure(long x, long y) {
+		System.out.println("illegal use of combined measurement: no measure on coordinate");
+	}
+
+	@Override
 	public void measure(long latency) 
 	{
 		checkEndOfUnit(false);
