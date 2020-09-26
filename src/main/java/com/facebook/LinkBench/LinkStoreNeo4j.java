@@ -939,7 +939,7 @@ public class LinkStoreNeo4j extends GraphStore {
     return sb.toString();
   }
   public static void main(String[] args) {
-    String uri = "bolt://localhost:7687";
+    String uri = "bolt://val06:7687";
     Driver driver = GraphDatabase.driver(uri, AuthTokens.basic("neo4j", "admin"));
     try (Session session = driver.session()) {
       session.writeTransaction(new TransactionWork<Void>() {
@@ -954,47 +954,48 @@ public class LinkStoreNeo4j extends GraphStore {
     }
 
     String dbid = "linkdb";
-    final Node node;
-    final long allocatedID = _nodeid.getAndIncrement();
-    StringBuilder sb = new StringBuilder();
-    /**
-     * merge (a {id:0})
-     * on create set a.data='hello', a.test=true
-     * on match set  a.data='world'
-     * with a, exists(a.test) as test 
-     * remove a.test 
-     * return test
-     */
+    final long id2s[] = new long[] {573842, 573843,573844};
 
-     
-    sb.append("UNWIND $props AS map match (a:{id:0}), (b:{id:1}) CREATE (a)-[r]->(b) SET r = map");
-    final String statement = sb.toString();
+    final String statement = "match (a:nt {id:$id1})-[r:`123456789`]->(b:nt) where b.id in $id2s return b.id as id2, r.data as data,r.time as time,r.version as version,r.visibility as visibility";
+
+    System.err.println("try run multi get");
     try (Session session = driver.session()) {
-      session.writeTransaction(new TransactionWork<Void>() {
+      Link[] linklist = session.readTransaction(new TransactionWork<Link[]>() {
         @Override 
-        public Void execute(Transaction tx) {
-          Map<String, Object> n1 = new HashMap<>();
-          n1.put( "name", "Andy" );
-          n1.put( "position", "Developer" );
-          n1.put( "awesome", true );
-          Map<String,Object> n2 = new HashMap<>();
-          n2.put( "name", "Michael" );
-          n2.put( "position", "Developer" );
-          n2.put( "children", 3 );
-          List<Map<String,Object>> maps = Arrays.asList( n1, n2 );
-          Map<String,Object> params = new HashMap<>();
-          params.put("props", maps);
-          // param.add(new HashMap<String, Object>() {{put("id", 0);}});
-          // param.add(new HashMap<String, Object>() {{put("id", 1);}});
-          // param.add(new HashMap<String, Object>() {{put("id", 2);}});
-          // tx.run(statement, Values.parameters(params));
-          tx.run(statement, params);
-          return null;
+        public Link[] execute(Transaction tx) {
+          List<Record> list = tx.run(statement, Values.parameters(
+              "id1", 573842,
+              "id2s", id2s)).list();
+          if (list.size() == 0) {
+            System.err.println("query normal executed with no result");
+            return new Link[0];
+          }
+          Link[] linklist = new Link[list.size()];
+
+          for (int i = 0; i < list.size(); i++) {
+            // Value val = tx.run(statement).next().get(0);
+            Record val = list.get(i);
+            Link l = new Link();
+            l.id1 = 573842;
+            l.link_type = 123456789;
+            l.id2 = val.get("id2").asLong();
+            l.time = val.get("time").asLong();
+            l.version = val.get("version").asInt();
+            l.visibility = (byte)val.get("visibility").asInt();
+            l.data = val.get("data").asString().getBytes();
+            linklist[i] = l;
+          }
+          System.err.println("query normal executed");
+          return linklist;
         }
       });
+      System.err.println("query normal executed2");
     } catch (Exception e) {
+      System.err.println(e.toString());
       throw e;
     }
+    
+    System.err.println("main done");
   }
 
 }
