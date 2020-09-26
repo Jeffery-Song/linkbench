@@ -246,18 +246,18 @@ public class LinkStoreNeo4j extends GraphStore {
   private static synchronized void staticOpenConnection(String uri_, String user_, String pwd_) throws Exception {
     if (driver_s == null) {
       driver_s = GraphDatabase.driver(uri_, AuthTokens.basic(user_, pwd_));
-      try (Session session = driver_s.session()) {
-        session.writeTransaction(new TransactionWork<Void>() {
-          @Override 
-          public Void execute(Transaction tx) {
-            // tx.run("CREATE INDEX ON :nt(id)");
-            tx.run("CREATE CONSTRAINT ON (n:nt) ASSERT n.id IS UNIQUE");
-            return null;
-          }
-        });
-      } catch (Exception e) {
-        throw e;
-      }
+      // try (Session session = driver_s.session()) {
+      //   session.writeTransaction(new TransactionWork<Void>() {
+      //     @Override 
+      //     public Void execute(Transaction tx) {
+      //       // tx.run("CREATE INDEX ON :nt(id)");
+      //       tx.run("CREATE CONSTRAINT ON (n:nt) ASSERT n.id IS UNIQUE");
+      //       return null;
+      //     }
+      //   });
+      // } catch (Exception e) {
+      //   throw e;
+      // }
     }
   }
 
@@ -274,18 +274,18 @@ public class LinkStoreNeo4j extends GraphStore {
 
     // driver = GraphDatabase.driver( uri, AuthTokens.basic( user, password ), config );
     driver = GraphDatabase.driver(uri, AuthTokens.basic(user, pwd), config);
-    try (Session session = driver.session()) {
-      session.writeTransaction(new TransactionWork<Void>() {
-        @Override 
-        public Void execute(Transaction tx) {
-          // tx.run("CREATE INDEX ON :nt(id)");
-          tx.run("CREATE CONSTRAINT ON (n:nt) ASSERT n.id IS UNIQUE");
-          return null;
-        }
-      });
-    } catch (Exception e) {
-      throw e;
-    }
+    // try (Session session = driver.session()) {
+    //   session.writeTransaction(new TransactionWork<Void>() {
+    //     @Override 
+    //     public Void execute(Transaction tx) {
+    //       // tx.run("CREATE INDEX ON :nt(id)");
+    //       tx.run("CREATE CONSTRAINT ON (n:nt) ASSERT n.id IS UNIQUE");
+    //       return null;
+    //     }
+    //   });
+    // } catch (Exception e) {
+    //   throw e;
+    // }
   }
 
   @Override
