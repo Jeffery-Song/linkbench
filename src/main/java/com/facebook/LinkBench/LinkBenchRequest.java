@@ -515,6 +515,7 @@ public class LinkBenchRequest implements Runnable {
                     + link.link_type + " id2=" + link.id2 + " added=" + added);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_deletelink) {
         type = LinkBenchOp.DELETE_LINK;
@@ -531,6 +532,7 @@ public class LinkBenchRequest implements Runnable {
                      + " id2=" + id2);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_updatelink) {
         type = LinkBenchOp.UPDATE_LINK;
@@ -555,6 +557,7 @@ public class LinkBenchRequest implements Runnable {
                 + link.link_type + " id2=" + link.id2 + " found=" + found);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_countlink) {
 
@@ -570,6 +573,7 @@ public class LinkBenchRequest implements Runnable {
                      + " count=" + count);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_getlink) {
 
@@ -595,6 +599,7 @@ public class LinkBenchRequest implements Runnable {
           numnotfound += nid2s - found;
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
 
       } else if (r <= pc_getlinklist) {
@@ -615,6 +620,7 @@ public class LinkBenchRequest implements Runnable {
           endtime = System.nanoTime();
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), links == null?1:0);
 
         // int count = ((links == null) ? 0 : links.length);
@@ -632,6 +638,7 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("addNode " + newNode);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_updatenode) {
         type = LinkBenchOp.UPDATE_NODE;
@@ -650,6 +657,7 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("updateNode " + newNode + " changed=" + changed);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_deletenode) {
         type = LinkBenchOp.DELETE_NODE;
@@ -664,6 +672,7 @@ public class LinkBenchRequest implements Runnable {
           logger.trace("deleteNode " + idToDelete + " deleted=" + deleted);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else if (r <= pc_getnode) {
         type = LinkBenchOp.GET_NODE;
@@ -681,6 +690,7 @@ public class LinkBenchRequest implements Runnable {
           }
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
         _measurements.reportReturnCode(type.displayName(), 0);
       } else {
         logger.error("No-op in requester: last probability < 1.0");
@@ -702,6 +712,7 @@ public class LinkBenchRequest implements Runnable {
       long endtime2 = System.nanoTime();
       long timetaken2 = (endtime2 - starttime)/1000;
       _measurements.measure(type.displayName(), timetaken2);
+      _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
       _measurements.reportReturnCode(type.displayName(), 1);
       if (recordStats) {
         stats.addStats(type, timetaken2, true);
@@ -713,6 +724,7 @@ public class LinkBenchRequest implements Runnable {
       long endtime2 = System.nanoTime();
       long timetaken2 = (endtime2 - starttime)/1000;
       _measurements.measure(type.displayName(), timetaken2);
+      _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
       _measurements.reportReturnCode(type.displayName(), 2);
       if (recordStats) {
         stats.addStats(type, timetaken2, true);
@@ -726,6 +738,7 @@ public class LinkBenchRequest implements Runnable {
 
       long timetaken2 = (endtime2 - starttime)/1000;
       _measurements.measure(type.displayName(), timetaken2);
+      _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
       _measurements.reportReturnCode(type.displayName(), 3);
 
       logger.error(type.displayName() + " error " +
