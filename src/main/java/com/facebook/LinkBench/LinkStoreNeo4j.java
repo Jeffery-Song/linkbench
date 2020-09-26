@@ -76,7 +76,9 @@ public class LinkStoreNeo4j extends GraphStore {
 
   // cypher query files
   public static final String CONFIG_ADD_LINK_QUERY = "neo4j.add_link.cypher";
+  public static final String CONFIG_ADD_ONLY_LINK_QUERY = "neo4j.add_only_link.cypher";
   public static final String CONFIG_ADD_NODE_QUERY = "neo4j.add_node.cypher";
+  public static final String CONFIG_GET_LINK_QUERY = "neo4j.get_link.cypher";
   public static final String CONFIG_GET_LINK_LIST_QUERY = "neo4j.get_link_list.cypher";
   public static final String CONFIG_GET_NODE_QUERY = "neo4j.get_node.cypher";
   // public static final String CONFIG_UPDATE_LINK_QUERY = "neo4j.update_link.cypher";
@@ -102,7 +104,9 @@ public class LinkStoreNeo4j extends GraphStore {
   private boolean use_given_path = false;
 
   private String add_link_query;
+  private String add_only_link_query;
   private String add_node_query;
+  private String get_link_query;
   private String get_link_list_query;
   private String get_node_query;
   // private String update_link_query;
@@ -191,17 +195,19 @@ public class LinkStoreNeo4j extends GraphStore {
       _nodeid = new AtomicLong(ConfigUtil.getLong(props, com.facebook.LinkBench.Config.MAX_ID));
     }
 
-    add_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_LINK_QUERY));
-    add_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_NODE_QUERY));
-    get_link_list_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_LINK_LIST_QUERY));
-    get_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_NODE_QUERY));
-    // update link is implemented by get link
-    // update_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_LINK_QUERY));
-    delete_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_QUERY));
+    add_link_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_LINK_QUERY));
+    add_only_link_query =       loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_ONLY_LINK_QUERY));
+    add_node_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_NODE_QUERY));
+    get_link_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_LINK_QUERY));
+    get_link_list_query =       loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_LINK_LIST_QUERY));
+    get_node_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_GET_NODE_QUERY));
+    // update link is implemented by add link
+    // update_link_query =      loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_LINK_QUERY));
+    delete_link_query =         loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_QUERY));
     delete_link_expunge_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_LINK_EXPUNGE_QUERY));
-    delete_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_NODE_QUERY));
-    multiget_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_MULTIGET_LINK_QUERY));
-    count_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_COUNT_LINK_QUERY));
+    delete_node_query =         loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_NODE_QUERY));
+    multiget_link_query =       loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_MULTIGET_LINK_QUERY));
+    count_link_query =          loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_COUNT_LINK_QUERY));
     use_given_path = ConfigUtil.getBool(props, "ali.request_via_explicit_path", false);
     if (use_given_path) {
       String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY);
@@ -329,7 +335,6 @@ public class LinkStoreNeo4j extends GraphStore {
               // System.err.println("Query is " + insert);
               StatementResult sr = tx.run(insert, Values.parameters(
                   "id1", l.id1,
-                  "type", l.link_type,
                   "id2", l.id2,
                   "visibility", (int)l.visibility,
                   "data", stringLiteral(l.data),
@@ -387,17 +392,15 @@ public class LinkStoreNeo4j extends GraphStore {
   public void addBulkLinks(String dbid, final List<Link> links, boolean noinverse)
       throws Exception {
 
-        StringBuilder sb = new StringBuilder();
         // final String insertBeforeType = 
-        sb.append("match (a:nt {id:$id1}), (b:nt {id : $id2}) create (a)-[r:`$link_type`]->(b) \n");
-        sb.append(" set r.id1=$id1"                + 
-                     ", r.type=$type"              +
-                     ", r.id2=$id2"                +
-                     ", r.visibility=$visibility " +
-                     ", r.data=$data "             +
-                     ", r.time=$time"              +
-                     ", r.version=$version"        + "\n");
-        final String query = sb.toString();
+        // sb.append("match (a:nt {id:$id1}), (b:nt {id : $id2}) create (a)-[r:`$link_type`]->(b) \n");
+        // sb.append(" set r.id1=$id1"                + 
+        //              ", r.id2=$id2"                +
+        //              ", r.visibility=$visibility " +
+        //              ", r.data=$data "             +
+        //              ", r.time=$time"              +
+        //              ", r.version=$version"        + "\n");
+        final String query = add_only_link_query;
 
         try (Session session = driver.session()) {
           // Long ts1 = System.nanoTime();
@@ -411,9 +414,8 @@ public class LinkStoreNeo4j extends GraphStore {
                 public Void execute(Transaction tx) {
                   for (Link l : links) {
                     // System.out.println(query.replace("$link_type", String.valueOf(l.link_type)));
-                    tx.run(query.replace("$link_type", String.valueOf(l.link_type)), Values.parameters(
+                    tx.run(query, Values.parameters(
                         "id1", l.id1,
-                        "type", l.link_type,
                         "id2", l.id2,
                         "visibility", (int)l.visibility,
                         "data", stringLiteral(l.data),
@@ -486,7 +488,7 @@ public class LinkStoreNeo4j extends GraphStore {
   public Link getLink(String dbid, final long id1, final long link_type, final long id2)
       throws Exception {
     assert(false);
-    final String statement = get_link_list_query;
+    final String statement = get_link_query.replace("$link_type", String.valueOf(link_type));
     try (Session session = driver.session()) {
 
       while (true) { // retry for deadlock
@@ -681,7 +683,6 @@ public class LinkStoreNeo4j extends GraphStore {
             @Override 
             public Void execute(Transaction tx) {
               tx.run(insert, Values.parameters("id", allocatedID,
-                                              "type", node.type,
                                               "time", node.time,
                                               "version", node.version,
                                               "data", stringLiteral(node.data)));
@@ -715,7 +716,6 @@ public class LinkStoreNeo4j extends GraphStore {
       ids[i] = id;
       maps.add(new HashMap<String, Object>() {{
         put("id", id); 
-        put("type", n.type);
         put("time", n.time);
         put("version", n.version);
         put("data", stringLiteral(n.data));
@@ -756,10 +756,10 @@ public class LinkStoreNeo4j extends GraphStore {
           return session.readTransaction(new TransactionWork<Node>() {
             @Override 
             public Node execute(Transaction tx) {
-              StatementResult sr = tx.run(statement, Values.parameters("id", id, "type", type));
+              StatementResult sr = tx.run(statement, Values.parameters("id", id));
               if (sr.hasNext() == false) return null;
               Value val = sr.single().get(0);
-              Node n = new Node(id, val.get("type").asInt(), 
+              Node n = new Node(id, type, 
                                     val.get("version").asLong(), 
                                     val.get("time").asInt(), 
                                     val.get("data").asByteArray());
@@ -811,7 +811,6 @@ public class LinkStoreNeo4j extends GraphStore {
             @Override 
             public Integer execute(Transaction tx) {
               StatementResult sr = tx.run(statement, Values.parameters("id", node.id,
-                                                                      "type", node.type,
                                                                       "time", node.time,
                                                                       "version", node.version,
                                                                       "data", stringLiteral(node.data)));
@@ -852,7 +851,7 @@ public class LinkStoreNeo4j extends GraphStore {
           return session.writeTransaction(new TransactionWork<Boolean>() {
             @Override 
             public Boolean execute(Transaction tx) {
-              StatementResult sr = tx.run(statement, Values.parameters("id", id, "type", type));
+              StatementResult sr = tx.run(statement, Values.parameters("id", id));
               if (sr.hasNext() == false) return null;
               return sr.single().get(0).asBoolean();
             }

@@ -160,7 +160,6 @@ public class LinkStoreCSVNeo4j extends GraphStore {
     StringBuilder sb = new StringBuilder();
     sb.append("" + l.id1 + "|" + l.id2);
     for (int i = 0; i < Link.fields().length; i++) {
-      if (l.link_type != 123456789) System.err.println("We hanve more than one link type");
       if (Link.fields()[i].equals("id1")) continue;
       if (Link.fields()[i].equals("id2")) continue;
       // if (Link.fields()[i].equals("link_type")) continue;
