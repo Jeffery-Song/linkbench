@@ -1065,7 +1065,11 @@ public class LinkStoreMysql extends GraphStore {
     if (use_given_path) {
       sql = update_node_query.replace("@node_list", AliPath.pathstring.get((int)node.id));
     } else {
-      sql = update_node_query.replace("@id", String.valueOf(node.id));
+      sql = update_node_query.replace("@id", String.valueOf(node.id))
+                             .replace("@version", String.valueOf(node.version))
+                             .replace("@time", String.valueOf(node.time))
+                             .replace("@type", String.valueOf(node.type))
+                             .replace("@data", stringLiteral(node.data));
     }
     // System.out.println(sql);
     // String sql = "UPDATE `" + dbid + "`.`" + nodetable + "`" +
