@@ -503,7 +503,7 @@ public class LinkStoreNeo4j extends GraphStore {
               l.id1 = id1;
               l.id2 = id2;
               l.link_type = link_type;
-              l.data = val.get("data").asByteArray();
+              l.data = val.get("data").asString().getBytes();
               l.time = val.get("time").asLong();
               l.version = val.get("version").asInt();
               l.visibility = (byte)val.get("visibility").asInt();
@@ -539,15 +539,15 @@ public class LinkStoreNeo4j extends GraphStore {
 
               for (int i = 0; i < list.size(); i++) {
                 // Value val = tx.run(statement).next().get(0);
-                Value val = list.get(i).get(0);
+                Record val = list.get(i);
                 Link l = new Link();
                 l.id1 = id1;
                 l.link_type = link_type;
                 l.id2 = val.get("id2").asLong();
-                l.data = val.get("data").asByteArray();
-                l.time = val.get("time").asLong();
-                l.version = val.get("version").asInt();
-                l.visibility = (byte)val.get("visibility").asInt();
+                l.data = val.get(1).get("data").asString().getBytes();
+                l.time = val.get(1).get("time").asLong();
+                l.version = val.get(1).get("version").asInt();
+                l.visibility = (byte)val.get(1).get("visibility").asInt();
                 linklist[i] = l;
               }
               return linklist;
@@ -596,20 +596,16 @@ public class LinkStoreNeo4j extends GraphStore {
 
               for (int i = 0; i < list.size(); i++) {
                 // Value val = tx.run(statement).next().get(0);
-                Value val = list.get(i).get(0);
+                Record val = list.get(i);
                 Link l = new Link();
                 l.id1 = id1;
                 l.link_type = link_type;
-                try {
-                  l.id2 = val.get("id2").asLong();
-                } catch (Exception e) {
-                  return new Link[0];
-                }
-                l.data = val.get("data").asByteArray();
-                l.time = val.get("time").asLong();
-                l.version = val.get("version").asInt();
-                // l.visibility = val.get("visibility").asByteArray()[0];
-                l.visibility = (byte)val.get("visibility").asInt();
+                l.id2 = val.get("id2").asLong();
+                l.data = val.get(1).get("data").asString().getBytes();
+                l.time = val.get(1).get("time").asLong();
+                l.version = val.get(1).get("version").asInt();
+                // l.visibility = val.get(1).get("visibility").asByteArray()[0];
+                l.visibility = (byte)val.get(1).get("visibility").asInt();
                 linklist[i] = l;
               }
               return linklist;
