@@ -41,6 +41,7 @@ public class LinkStoreCCGraph extends GraphStore {
   private static String __sync = "";
   private static AtomicLong _nodeid;
   private Measurements _measurements = Measurements.getMeasurements();
+  private boolean is_ali = true;
   
   /** Construct client connecting to HelloWorld server at {@code host:port}. */
   // public LinkStoreCCGraph(String host, int port) {
@@ -66,6 +67,7 @@ public class LinkStoreCCGraph extends GraphStore {
         channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
       this.blockingStub = CCGraphServerGrpc.newBlockingStub(channel);
     }
+    is_ali = ConfigUtil.getBool(p, "is_ali");
   }
   /**
    * Do any cleanup.  After this is called, store won't be reused
@@ -109,46 +111,122 @@ public class LinkStoreCCGraph extends GraphStore {
 
   public boolean addLink(String dbid, Link a, boolean noinverse) throws Exception {
     checkDBID(dbid);
-    // assert(noinverse == true);
-    // com.simplegraph.simplegraph.Link.Builder sglinkbuilder = sgLinkBuilder(a);
-    // CallParam.Builder rqst = CallParam.newBuilder();
 
-    // rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.id1)));
-    // rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.id2)));
-    // rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.link_type)));
-    // rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.visibility == LinkStore.VISIBILITY_HIDDEN)));
-    // rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.version)));
-    // rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.time)));
-    // rqst.addParamList(ByteString.copyFromUtf8(a.data));
+    CallParam.Builder rqst = CallParam.newBuilder();
 
-    // rqst.setTxnName(ByteString.copyFromUtf8("linkbench_add_link"));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.id1)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.id2)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.link_type)));
+    rqst.addParamList(ByteString.copyFrom(a.data));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.visibility)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.version)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.time)));
 
-    // Results rply = blockingStub.runTxn(rqst.build());
-    // if (!rply.getCode().equals(Code.kOk)) {
-    //   // blockingStub.abort(txnidmsg);
-    //   throw new ConflictException(String.format("Add link failed: (%d, %d, %d)", a.id1,
-    //                       a.link_type, a.id2));
-    // }
-    // fixme: 
-    // return c.equals(Code.kOk);
-    throw new Exception("Unimplemented");
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_upsert_link"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("Insert link failed: (%d, %d)", a.id1, a.id2));
+    }
+
+    int inserted = Integer.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).intValue();
+    return inserted == 1;
   }
   public boolean updateLink(String dbid, Link a, boolean noinverse) throws Exception {
-    throw new Exception("Unimplemented");
+    return !addLink(dbid, a, noinverse);
   }
   public boolean deleteLink(String dbid, long id1, long link_type,
       long id2, boolean noinverse, boolean expunge) throws Exception {
-    throw new Exception("Unimplemented");
+    checkDBID(dbid);
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id1)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id2)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(link_type)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_delete_link"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (rply.getCode().equals(Code.kOk)) {
+      return true;
+    } else if (rply.getCode().equals(Code.kAbort)) {
+      return false;
+    } else {
+      throw new Exception(String.format("delete link failed: (%d, %d)", id1, id2));
+    }
   }
   public Link getLink(String dbid, long id1, long link_type, long id2) 
       throws Exception {
-    throw new Exception("Unimplemented");
+    checkDBID(dbid);
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id1)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id2)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(link_type)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_get_link"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("get link failed: (%d, %d)", id1, id2));
+    }
+
+    if (rply.getTableCount() == 0) return null;
+
+    Link ret = new Link();
+    ret.id1 = id1;
+    ret.link_type = link_type;
+    ret.id2 = id2;
+    ret.data = rply.getTable(0).getOneRow(0).toByteArray();
+    ret.visibility = Byte.valueOf(rply.getTable(0).getOneRow(1).toStringUtf8()).byteValue();
+    ret.version = Integer.valueOf(rply.getTable(0).getOneRow(2).toStringUtf8()).intValue();
+    ret.time = Long.valueOf(rply.getTable(0).getOneRow(3).toStringUtf8()).longValue();
+
+    return ret;
   }
   @Override
   public Link[] multigetLinks(String dbid, long id1, long link_type,
       long id2s[]) 
       throws Exception {
-    throw new Exception("Unimplemented");
+    checkDBID(dbid);
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id1)));
+    String id2_string = "";
+    if (id2s.length > 0) id2_string = String.valueOf(id2s[0]);
+    for (int i = 1; i < id2s.length; i++) {
+      id2_string = id2_string + "_" + String.valueOf(id2s[i]);
+    }
+    rqst.addParamList(ByteString.copyFromUtf8(id2_string));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(link_type)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_multi_get_link"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("multi get link failed: (%d)", id1));
+    }
+
+    if (rply.getTableCount() == 0) return new Link[0];
+    Link[] ret = new Link[rply.getTableCount()];
+    for (int i = 0; i < ret.length; i++) {
+      ret[i] = new Link();
+      ret[i].id1 = id1;
+      ret[i].link_type = link_type; 
+      ret[i].id2 = Long.valueOf(rply.getTable(i).getOneRow(0).toStringUtf8()).longValue();
+      ret[i].data = rply.getTable(i).getOneRow(1).toByteArray();
+      ret[i].visibility = Byte.valueOf(rply.getTable(i).getOneRow(2).toStringUtf8()).byteValue();
+      ret[i].version = Integer.valueOf(rply.getTable(i).getOneRow(3).toStringUtf8()).intValue();
+      ret[i].time = Long.valueOf(rply.getTable(i).getOneRow(4).toStringUtf8()).longValue();
+    }
+    return ret;
   }
   public Link[] getLinkList(String dbid, long id1, long link_type) 
       throws Exception {
@@ -158,20 +236,112 @@ public class LinkStoreCCGraph extends GraphStore {
       long minTimestamp, long maxTimestamp, int offset, int limit) 
       throws Exception {
     checkDBID(dbid);
-    throw new Exception("Unimplemented");
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id1)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(link_type)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(minTimestamp)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(maxTimestamp)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(offset)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(limit)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_get_link_list"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("get link list failed: (%d)", id1));
+    }
+
+    if (rply.getTableCount() == 0) return new Link[0];
+    Link[] ret = new Link[rply.getTableCount()];
+    for (int i = 0; i < ret.length; i++) {
+      ret[i] = new Link();
+      ret[i].id1 = id1;
+      ret[i].link_type = link_type; 
+      ret[i].id2 = Long.valueOf(rply.getTable(i).getOneRow(0).toStringUtf8()).longValue();
+      ret[i].data = rply.getTable(i).getOneRow(1).toByteArray();
+      ret[i].visibility = Byte.valueOf(rply.getTable(i).getOneRow(2).toStringUtf8()).byteValue();
+      ret[i].version = Integer.valueOf(rply.getTable(i).getOneRow(3).toStringUtf8()).intValue();
+      ret[i].time = Long.valueOf(rply.getTable(i).getOneRow(4).toStringUtf8()).longValue();
+    }
+    return ret;
   }
   public long countLinks(String dbid, long id1, long link_type) 
       throws Exception {
     checkDBID(dbid);
-    throw new Exception("Unimplemented");
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id1)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(link_type)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_count_link"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("count link failed: (%d)", id1));
+    }
+
+    long link_count = Long.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).longValue();
+    return link_count;
   }
 
   public long addNode(String dbid, Node node) throws Exception {
     checkDBID(dbid);
-    throw new Exception("Unimplemented");
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+    long id = _nodeid.getAndIncrement();
+    node.id = id;
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.id)));
+    rqst.addParamList(ByteString.copyFrom(node.data));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.version)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.time)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_insert_node"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      // blockingStub.abort(txnidmsg);
+      throw new Exception(String.format("Insert node failed: (%d, %d)", node.id, node.type));
+    }
+
+    return id;
   }
   
   public boolean updateNode(String dbid, Node node) throws Exception {
+    if (is_ali) return aliUpdateNode(dbid, node);
+    else return linkbenchUpdateNode(dbid, node);
+  }
+
+  public boolean linkbenchUpdateNode(String dbid, Node node) throws Exception {
+    checkDBID(dbid);
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.id)));
+    rqst.addParamList(ByteString.copyFrom(node.data));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.version)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.time)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_update_node"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      // blockingStub.abort(txnidmsg);
+      throw new Exception(String.format("Update node failed: (%d, %d)", node.id, node.type) + rply.getTable(0).getOneRow(0).toStringUtf8());
+    }
+    long node_count = Long.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).longValue();
+
+    return node_count > 0;
+  }
+
+  public boolean aliUpdateNode(String dbid, Node node) throws Exception {
     long start_time = System.nanoTime();
     checkDBID(dbid);
 
@@ -209,12 +379,55 @@ public class LinkStoreCCGraph extends GraphStore {
     _measurements.measure("node_count", node_count*1000);
     return rply.getCode().equals(Code.kOk);
   }
+
   public boolean deleteNode(String dbid, int type, long id) throws Exception {
     checkDBID(dbid);
-    throw new Exception("Unimplemented");
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_delete_node"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      // blockingStub.abort(txnidmsg);
+      throw new Exception(String.format("Delete node failed: (%d, %d)", id, type));
+    }
+    long node_count = Long.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).longValue();
+
+    return node_count > 0;
   }
   public Node getNode(String dbid, int type, long id) throws Exception {
     checkDBID(dbid);
-    throw new Exception("Unimplemented");
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(id)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_get_node"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("get node failed: (%d)", id));
+    }
+
+    if (rply.getTableCount() == 0) return null;
+
+    byte data[] = rply.getTable(0).getOneRow(0).toByteArray();
+    long version = Long.valueOf(rply.getTable(0).getOneRow(1).toStringUtf8()).longValue();
+    int time = Integer.valueOf(rply.getTable(0).getOneRow(2).toStringUtf8()).intValue();
+
+    Node ret = new Node(
+      id,
+      type,
+      version,
+      time,
+      data
+    );
+
+    return ret;
   }
 }
