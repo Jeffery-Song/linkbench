@@ -126,15 +126,44 @@ public class LinkStoreCCGraph extends GraphStore {
     rqst.setRetry(true);
 
     Results rply = blockingStub.runTxn(rqst.build());
+    if (rply.getCode().equals(Code.kAbort)) {
+      // id2 not exist
+      return false;
+    }
     if (!rply.getCode().equals(Code.kOk)) {
-      throw new Exception(String.format("Insert link failed: (%d, %d)", a.id1, a.id2));
+      throw new Exception(String.format("Insert link failed: (%d, %d)", a.id1, a.id2) + rply.getTable(0).getOneRow(0).toStringUtf8());
     }
 
     int inserted = Integer.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).intValue();
     return inserted == 1;
   }
   public boolean updateLink(String dbid, Link a, boolean noinverse) throws Exception {
-    return !addLink(dbid, a, noinverse);
+    checkDBID(dbid);
+
+    CallParam.Builder rqst = CallParam.newBuilder();
+
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.id1)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.id2)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.link_type)));
+    rqst.addParamList(ByteString.copyFrom(a.data));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.visibility)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.version)));
+    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(a.time)));
+
+    rqst.setTxnName(ByteString.copyFromUtf8("lb_upsert_link"));
+    rqst.setRetry(true);
+
+    Results rply = blockingStub.runTxn(rqst.build());
+    if (rply.getCode().equals(Code.kAbort)) {
+      // id2 not exist
+      return false;
+    }
+    if (!rply.getCode().equals(Code.kOk)) {
+      throw new Exception(String.format("Update link failed: (%d, %d)", a.id1, a.id2) + rply.getTable(0).getOneRow(0).toStringUtf8());
+    }
+
+    int inserted = Integer.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).intValue();
+    return inserted == 0;
   }
   public boolean deleteLink(String dbid, long id1, long link_type,
       long id2, boolean noinverse, boolean expunge) throws Exception {
@@ -201,7 +230,7 @@ public class LinkStoreCCGraph extends GraphStore {
     String id2_string = "";
     if (id2s.length > 0) id2_string = String.valueOf(id2s[0]);
     for (int i = 1; i < id2s.length; i++) {
-      id2_string = id2_string + "_" + String.valueOf(id2s[i]);
+      id2_string = id2_string + "," + String.valueOf(id2s[i]);
     }
     rqst.addParamList(ByteString.copyFromUtf8(id2_string));
     rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(link_type)));
@@ -391,13 +420,14 @@ public class LinkStoreCCGraph extends GraphStore {
     rqst.setRetry(true);
 
     Results rply = blockingStub.runTxn(rqst.build());
+    if (rply.getCode().equals(Code.kAbort)) {
+      return false;
+    }
     if (!rply.getCode().equals(Code.kOk)) {
       // blockingStub.abort(txnidmsg);
       throw new Exception(String.format("Delete node failed: (%d, %d)", id, type));
     }
-    long node_count = Long.valueOf(rply.getTable(0).getOneRow(0).toStringUtf8()).longValue();
-
-    return node_count > 0;
+    return true;
   }
   public Node getNode(String dbid, int type, long id) throws Exception {
     checkDBID(dbid);
