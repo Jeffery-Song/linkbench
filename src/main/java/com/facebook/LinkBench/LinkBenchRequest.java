@@ -738,7 +738,7 @@ public class LinkBenchRequest implements Runnable {
 
       long timetaken2 = (endtime2 - starttime)/1000;
       _measurements.measure(type.displayName(), timetaken2);
-      _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+      _measurements.measure("OVERALL_M", (endtime2 - starttime)/1000);
       _measurements.reportReturnCode(type.displayName(), 3);
 
       logger.error(type.displayName() + " error " +
@@ -747,6 +747,7 @@ public class LinkBenchRequest implements Runnable {
         stats.addStats(type, timetaken2, true);
       }
       linkStore.clearErrors(requesterID);
+      System.exit(1);
       return false;
     }
   }
