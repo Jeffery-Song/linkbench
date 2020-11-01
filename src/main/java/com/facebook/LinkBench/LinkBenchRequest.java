@@ -31,6 +31,8 @@ import com.facebook.LinkBench.RealDistribution.DistributionType;
 import com.facebook.LinkBench.distributions.AccessDistributions;
 import com.facebook.LinkBench.distributions.AccessDistributions.AccessDistribution;
 import com.facebook.LinkBench.distributions.ID2Chooser;
+import com.facebook.LinkBench.distributions.ID2ChooserBase;
+import com.facebook.LinkBench.distributions.AliID2Chooser;
 import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.distributions.ProbabilityDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
@@ -42,6 +44,9 @@ import com.facebook.LinkBench.measurements.Measurements;
 
 public class LinkBenchRequest implements Runnable {
   private static long start_time;
+
+  // only for ali case. 
+  private static AtomicLong _nodeid;
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
   Properties props;
@@ -98,8 +103,18 @@ public class LinkBenchRequest implements Runnable {
   double pc_updatenode;
   double pc_getnode;
 
+  double pc_ali_login;
+  double pc_ali_reg;
+  double pc_ali_pay;
+  double pc_ali_get_fan;
+  double pc_ali_get_follow;
+  double pc_ali_recom;
+  double pc_ali_follow;
+  double pc_ali_unfollow;
   // Chance of doing historical range query
   double p_historical_getlinklist;
+
+  boolean is_ali;
 
   private static class HistoryKey {
     public final long id1;
@@ -181,7 +196,7 @@ public class LinkBenchRequest implements Runnable {
   private AccessDistribution nodeUpdateDist; // node writes
   private AccessDistribution nodeDeleteDist; // node deletes
 
-  private ID2Chooser id2chooser;
+  private ID2ChooserBase id2chooser;
   public LinkBenchRequest(LinkStore linkStore,
                           NodeStore nodeStore,
                           Properties props,
@@ -206,6 +221,7 @@ public class LinkBenchRequest implements Runnable {
     this.nrequesters = nrequesters;
     this.requesterID = requesterID;
 
+    is_ali = ConfigUtil.getBool(props, "is_ali");
     debuglevel = ConfigUtil.getDebugLevel(props);
     dbid = ConfigUtil.getPropertyRequired(props, Config.DBID);
     numRequests = ConfigUtil.getLong(props, Config.NUM_REQUESTS);
@@ -258,6 +274,11 @@ public class LinkBenchRequest implements Runnable {
 
     lastNodeId = startid1;
     _measurements=Measurements.getMeasurements();
+    synchronized(this.getClass()) {
+      if (_nodeid == null) {
+        _nodeid = new AtomicLong(maxid1);
+      }
+    }
   }
 
   private void initRequestProbabilities(Properties props) {
@@ -273,9 +294,18 @@ public class LinkBenchRequest implements Runnable {
     pc_deletenode = pc_updatenode + ConfigUtil.getDouble(props, Config.PR_DELETE_NODE, 0.0);
     pc_getnode = pc_deletenode + ConfigUtil.getDouble(props, Config.PR_GET_NODE, 0.0);
 
-    if (Math.abs(pc_getnode - 100.0) > 1e-5) {//compare real numbers
+    pc_ali_login      = pc_getnode        + ConfigUtil.getDouble(props, Config.PR_ALI_LOGIN, 0.0);
+    pc_ali_reg        = pc_ali_login      + ConfigUtil.getDouble(props, Config.PR_ALI_REG, 0.0);
+    pc_ali_pay        = pc_ali_reg        + ConfigUtil.getDouble(props, Config.PR_ALI_PAY, 0.0);
+    pc_ali_get_fan    = pc_ali_pay        + ConfigUtil.getDouble(props, Config.PR_ALI_GET_FAN, 0.0);
+    pc_ali_get_follow = pc_ali_get_fan    + ConfigUtil.getDouble(props, Config.PR_ALI_GET_FOLLOW, 0.0);
+    pc_ali_recom      = pc_ali_get_follow + ConfigUtil.getDouble(props, Config.PR_ALI_RECOM, 0.0);
+    pc_ali_follow     = pc_ali_recom      + ConfigUtil.getDouble(props, Config.PR_ALI_FOLLOW, 0.0);
+    pc_ali_unfollow   = pc_ali_follow     + ConfigUtil.getDouble(props, Config.PR_ALI_UNFOLLOW, 0.0);
+
+    if (Math.abs(pc_ali_follow - 100.0) > 1e-5) {//compare real numbers
       throw new LinkBenchConfigError("Percentages of request types do not " +
-                  "add to 100, only " + pc_getnode + "!");
+                  "add to 100, only " + pc_ali_follow + "!");
     }
   }
 
@@ -309,8 +339,12 @@ public class LinkBenchRequest implements Runnable {
       }
     }
 
-    id2chooser = new ID2Chooser(props, startid1, maxid1,
-                                nrequesters, requesterID);
+    if (is_ali) {
+      id2chooser = new AliID2Chooser(props, startid1, maxid1, nrequesters, requesterID);
+    } else {
+      id2chooser = new ID2Chooser(props, startid1, maxid1,
+        nrequesters, requesterID);
+    }
 
     // Distribution of #id2s per multiget
     String multigetDistClass = props.getProperty(Config.LINK_MULTIGET_DIST);
@@ -688,6 +722,138 @@ public class LinkBenchRequest implements Runnable {
           } else {
             logger.trace("getNode " + fetched);
           }
+        }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
+      } else if (r <= pc_ali_login) {
+        type = LinkBenchOp.ALI_LOGIN;
+        // Choose an id that has previously been created (but might have
+        // been since deleted
+        long upId = chooseRequestID(DistributionType.NODE_UPDATES,
+                                     lastNodeId);
+        // Generate new data randomly
+        // Node newNode = createUpdateNode(upId);
+
+        starttime = System.nanoTime();
+        long updated_nodes = nodeStore.aliLogin(upId);
+        endtime = System.nanoTime();
+        lastNodeId = upId;
+        if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+          logger.trace("login " + upId + " updated_nodes=" + updated_nodes);
+        }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
+      } else if (r <= pc_ali_reg) {
+        type = LinkBenchOp.ALI_REG;
+        Node newNode = createAddNode();
+        newNode.id = _nodeid.getAndIncrement();
+        if (id2chooser.calcLinkCount(newNode.id, LinkStore.REFERRER_LINK_TYPE) == 1) {
+          starttime = System.nanoTime();
+          long referrer_id = id2chooser.chooseForOp(rng, newNode.id, LinkStore.REFERRER_LINK_TYPE, 1);
+          nodeStore.aliRegRef(newNode, referrer_id);
+          endtime = System.nanoTime();
+        } else {
+          starttime = System.nanoTime();
+          nodeStore.aliReg(newNode);
+          endtime = System.nanoTime();
+        }
+        lastNodeId = newNode.id;
+        if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+          logger.trace("register " + newNode);
+        }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
+      } else if (r <= pc_ali_pay) {
+        // generate add request
+        type = LinkBenchOp.ALI_PAY;
+        link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
+        link.id2 = id2chooser.chooseForOp(rng, link.id1, LinkStore.TRANSFER_FAKE_LINK_TYPE,
+                                                ID2Chooser.P_UPDATE_EXIST);
+
+        starttime = System.nanoTime();
+        // no inverses for now
+        boolean alreadyExists = nodeStore.aliPay(link.id1, link.id2);
+        boolean added = !alreadyExists;
+        endtime = System.nanoTime();
+        if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+          logger.trace("ali pay id1=" + link.id1 + " id2=" + link.id2 + " added=" + added);
+        }
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
+      } else if (r <= pc_ali_get_fan) {
+        // taken from get link list
+        type = LinkBenchOp.ALI_GET_FAN;
+        Node nodes[];
+
+        long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        long link_type = id2chooser.chooseRandomLinkType(rng);
+        starttime = System.nanoTime();
+        nodes = linkStore.aliGetFan(id1);
+        endtime = System.nanoTime();
+
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), nodes == null?1:0);
+      } else if (r <= pc_ali_get_follow) {
+        // taken from get link list
+        type = LinkBenchOp.ALI_GET_FOLLOW;
+        Node nodes[];
+
+        long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        long link_type = id2chooser.chooseRandomLinkType(rng);
+        starttime = System.nanoTime();
+        nodes = linkStore.aliGetFollow(id1);
+        endtime = System.nanoTime();
+
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), nodes == null?1:0);
+      } else if (r <= pc_ali_recom) {
+        // taken from get link list
+        type = LinkBenchOp.ALI_RECOM;
+        Node nodes[];
+
+        long id1 = chooseRequestID(DistributionType.LINK_READS, link.id1);
+        starttime = System.nanoTime();
+        nodes = linkStore.aliRecom(id1);
+        endtime = System.nanoTime();
+
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), nodes == null?1:0);
+      } else if (r <= pc_ali_follow) {
+        // tabek from add link
+        type = LinkBenchOp.ALI_FOLLOW;
+        link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
+        link.link_type = LinkStore.DEFAULT_LINK_TYPE;
+        link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type,
+                                                ID2Chooser.P_ADD_EXIST);
+        link.time = System.currentTimeMillis();
+
+        starttime = System.nanoTime();
+        // no inverses for now
+        boolean alreadyExists = linkStore.aliFollow(link);
+        endtime = System.nanoTime();
+        _measurements.measure(type.displayName(), (endtime - starttime)/1000);
+        _measurements.measure("OVERALL_M", (endtime - starttime)/1000);
+        _measurements.reportReturnCode(type.displayName(), 0);
+      } else if (r <= pc_ali_unfollow) {
+        // taken from delete link
+        type = LinkBenchOp.ALI_UNFOLLOW;
+        long id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
+        long id2 = id2chooser.chooseForOp(rng, id1, LinkStore.DEFAULT_LINK_TYPE,
+                                          ID2Chooser.P_DELETE_EXIST);
+        starttime = System.nanoTime();
+        linkStore.deleteLink(dbid, id1, LinkStore.DEFAULT_LINK_TYPE, id2, true, // no inverse
+            false);
+        endtime = System.nanoTime();
+        if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+          logger.trace("ali unfollow id1=" + id1 + " link_type=" + LinkStore.DEFAULT_LINK_TYPE
+                     + " id2=" + id2);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);
         _measurements.measure("OVERALL_M", (endtime - starttime)/1000);

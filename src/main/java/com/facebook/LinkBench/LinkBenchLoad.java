@@ -29,7 +29,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.facebook.LinkBench.distributions.ID2ChooserBase;
 import com.facebook.LinkBench.distributions.ID2Chooser;
+import com.facebook.LinkBench.distributions.AliID2Chooser;
 import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
 import com.facebook.LinkBench.stats.LatencyStats;
@@ -62,10 +64,12 @@ public class LinkBenchLoad implements Runnable {
   private SampledStats stats;
   private LatencyStats latencyStats;
 
+  private boolean is_ali;
+
   Level debuglevel;
   String dbid;
 
-  private ID2Chooser id2chooser;
+  private ID2ChooserBase id2chooser;
 
   // Counters for load statistics
   long sameShuffle;
@@ -173,7 +177,12 @@ public class LinkBenchLoad implements Runnable {
     diffShuffle = 0;
     stats = new SampledStats(loaderID, maxsamples, csvStreamOut);
 
-    id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
+    is_ali = ConfigUtil.getBool(props, "is_ali");
+    if (is_ali) {
+      id2chooser = new AliID2Chooser(props, startid1, maxid1, 1, 1);
+    } else {
+      id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
+    }
   }
 
   public long getLinksLoaded() {
@@ -425,6 +434,10 @@ public class LinkBenchLoad implements Runnable {
     // which id2s exist. So link id1 to
     // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
     // config randomid2max is nonzero.
+
+    // if (is_ali) {
+      
+    // } else {
     if (singleAssoc) {
       link.id2 = 45; // some constant
     } else {
@@ -436,6 +449,7 @@ public class LinkBenchLoad implements Runnable {
     if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
       logger.trace("id2 chosen is " + link.id2);
     }
+    // }
 
     // Randomize time so that id2 and timestamp aren't closely correlated
     link.time = chooseInitialTimestamp(rng);

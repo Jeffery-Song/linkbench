@@ -36,4 +36,43 @@ public abstract class GraphStore extends LinkStore implements NodeStore {
   public int getRetries() {
     return 0;
   }
+
+
+  // ali link store
+  // return all links
+  public Node[] aliGetFan(long id) throws Exception {
+    throw new Exception("Not implemented aliGetFan");
+  }
+  // return all nodes
+  public Node[] aliGetFollow(long id) throws Exception {
+    throw new Exception("Not implemented aliGetFollow");
+  }
+  public Node[] aliRecom(long id) throws Exception {
+    throw new Exception("Not implemented aliRecom");
+  }
+  public boolean aliFollow(Link l) throws Exception {
+    throw new Exception("Not implemented aliFollow");
+  }
+  public boolean aliUnfollow(long id1, long id2) throws Exception {
+    throw new Exception("Not implemented aliUnfollow");
+  }
+
+
+  // ali node store
+  // returns updated node count
+  public long aliLogin(long id) throws Exception {
+    throw new Exception("Not implemented aliLogin");
+  }
+  // returns updated node count, new node id is returned through node.id
+  public long aliReg(Node node) throws Exception {
+    throw new Exception("Not implemented aliReg");
+  }
+  // returns updated node count, new node id is returned through node.id
+  public long aliRegRef(Node node, long referrer) throws Exception {
+    throw new Exception("Not implemented aliRegRef");
+  }
+  // nothing to return
+  public boolean aliPay(long id1, long id2) throws Exception {
+    throw new Exception("Not implemented aliPay");
+  }
 }

@@ -90,6 +90,17 @@ public class LinkStoreNeo4j extends GraphStore {
   public static final String CONFIG_UPDATE_NODE_QUERY = "neo4j.update_node.cypher";
   public static final String CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY = "neo4j.update_node_given_path.cypher";
 
+
+  public static final String CONFIG_ALI_LOGIN_QUERY = "neo4j.ali_login.cypher";
+  public static final String CONFIG_ALI_REG_QUERY = "neo4j.ali_reg.cypher";
+  public static final String CONFIG_ALI_REG_REF_QUERY = "neo4j.ali_reg_ref.cypher";
+  public static final String CONFIG_ALI_PAY_QUERY = "neo4j.ali_pay.cypher";
+  public static final String CONFIG_ALI_GET_FAN_QUERY = "neo4j.ali_get_fan.cypher";
+  public static final String CONFIG_ALI_GET_FOLLOW_QUERY = "neo4j.ali_get_follow.cypher";
+  public static final String CONFIG_ALI_RECOM_QUERY = "neo4j.ali_recom.cypher";
+  public static final String CONFIG_ALI_FOLLOW_QUERY = "neo4j.ali_follow.cypher";
+  public static final String CONFIG_ALI_UNFOLLOW_QUERY = "neo4j.ali_unfollow.cypher";
+
   public static final int DEFAULT_BULKINSERT_SIZE = 20;
 
   private static final boolean INTERNAL_TESTING = false;
@@ -117,6 +128,17 @@ public class LinkStoreNeo4j extends GraphStore {
   private String multiget_link_query;
   private String count_link_query;
   // private String template_query;
+
+
+  private String ali_login_query;
+  private String ali_reg_query;
+  private String ali_reg_ref_query;
+  private String ali_pay_query;
+  private String ali_get_fan_query;
+  private String ali_get_follow_query;
+  private String ali_recom_query;
+  private String ali_follow_query;
+  private String ali_unfollow_query;
 
   // String linktable;
   // String counttable;
@@ -208,6 +230,7 @@ public class LinkStoreNeo4j extends GraphStore {
     delete_node_query =         loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_DELETE_NODE_QUERY));
     multiget_link_query =       loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_MULTIGET_LINK_QUERY));
     count_link_query =          loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_COUNT_LINK_QUERY));
+
     use_given_path = ConfigUtil.getBool(props, "ali.request_via_explicit_path", false);
     if (use_given_path) {
       String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY);
@@ -218,6 +241,15 @@ public class LinkStoreNeo4j extends GraphStore {
       update_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_QUERY));
       // System.err.println("loading from " + fname);
     }
+
+    ali_login_query =               loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_LOGIN_QUERY));
+    ali_reg_query =                 loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_REG_QUERY));
+    ali_pay_query =                 loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_PAY_QUERY));
+    ali_get_fan_query =             loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_GET_FAN_QUERY));
+    ali_get_follow_query =          loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_GET_FOLLOW_QUERY));
+    ali_recom_query =               loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_RECOM_QUERY));
+    ali_follow_query =              loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_FOLLOW_QUERY));
+    ali_unfollow_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_UNFOLLOW_QUERY));
 
     // update link is implemented by get link
     // update_link_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_LINK_QUERY));
@@ -606,7 +638,7 @@ public class LinkStoreNeo4j extends GraphStore {
                 l.data = val.get(1).get("data").asString().getBytes();
                 l.time = val.get(1).get("time").asLong();
                 l.version = val.get(1).get("version").asInt();
-                // l.visibility = val.get(1).get("visibility").asByteArray()[0];
+                // l.visibility = val.get(1).get("visibility").asString().getBytes()[0];
                 l.visibility = (byte)val.get(1).get("visibility").asInt();
                 linklist[i] = l;
               }
@@ -762,7 +794,7 @@ public class LinkStoreNeo4j extends GraphStore {
               Node n = new Node(id, type, 
                                     val.get("version").asLong(), 
                                     val.get("time").asInt(), 
-                                    val.get("data").asByteArray());
+                                    val.get("data").asString().getBytes());
               return n;
             }
           });
@@ -867,6 +899,263 @@ public class LinkStoreNeo4j extends GraphStore {
     }
   }
 
+  @Override
+  public Node[] aliGetFan(final long id) throws Exception {
+    final String statement = ali_get_fan_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.readTransaction(new TransactionWork<Node[]>() {
+            @Override 
+            public Node[] execute(Transaction tx) {
+              List<Record> list = tx.run(statement, Values.parameters(
+                  "id", id)).list();
+              if (list.size() == 0) return new Node[0];
+              Node[] nodelist = new Node[list.size()];
+
+              for (int i = 0; i < list.size(); i++) {
+                // Value val = tx.run(statement).next().get(0);
+                Record val = list.get(i);          
+                Node n = new Node(
+                  val.get("id").asLong(),
+                  LinkStore.DEFAULT_NODE_TYPE, 
+                                      val.get("version").asLong(), 
+                                      val.get("time").asInt(), 
+                                      val.get("data").asString().getBytes());
+                nodelist[i] = n;
+              }
+              return nodelist;
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Override
+  public Node[] aliGetFollow(final long id) throws Exception {
+    final String statement = ali_get_follow_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.readTransaction(new TransactionWork<Node[]>() {
+            @Override 
+            public Node[] execute(Transaction tx) {
+              List<Record> list = tx.run(statement, Values.parameters(
+                  "id", id)).list();
+              if (list.size() == 0) return new Node[0];
+              Node[] nodelist = new Node[list.size()];
+
+              for (int i = 0; i < list.size(); i++) {
+                // Value val = tx.run(statement).next().get(0);
+                Record val = list.get(i);          
+                Node n = new Node(
+                  val.get("id").asLong(),
+                  LinkStore.DEFAULT_NODE_TYPE, 
+                                      val.get("version").asLong(), 
+                                      val.get("time").asInt(), 
+                                      val.get("data").asString().getBytes());
+                nodelist[i] = n;
+              }
+              return nodelist;
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+  @Override
+  public Node[] aliRecom(final long id) throws Exception {
+    final String statement = ali_recom_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.readTransaction(new TransactionWork<Node[]>() {
+            @Override 
+            public Node[] execute(Transaction tx) {
+              List<Record> list = tx.run(statement, Values.parameters(
+                  "id", id)).list();
+              if (list.size() == 0) return new Node[0];
+              Node[] nodelist = new Node[list.size()];
+
+              for (int i = 0; i < list.size(); i++) {
+                // Value val = tx.run(statement).next().get(0);
+                Record val = list.get(i);          
+                Node n = new Node(
+                  val.get("id").asLong(),
+                  LinkStore.DEFAULT_NODE_TYPE, 
+                                      val.get("version").asLong(), 
+                                      val.get("time").asInt(), 
+                                      val.get("data").asString().getBytes());
+                nodelist[i] = n;
+              }
+              return nodelist;
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Override
+  public boolean aliFollow(final Link l) throws Exception {
+    final String statement = ali_follow_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.writeTransaction(new TransactionWork<Boolean>() {
+            @Override 
+            public Boolean execute(Transaction tx) {
+             return  tx.run(statement, Values.parameters(
+                  "id1", l.id1,
+                  "id2", l.id2,
+                  "visibility", (int)l.visibility,
+                  "data", stringLiteral(l.data),
+                  "time", l.time,
+                  "version", l.version)).next().get(0).asBoolean();
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+  @Override
+  public boolean aliUnfollow(final long id1, final long id2) throws Exception {
+    final String statement = ali_unfollow_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.writeTransaction(new TransactionWork<Boolean>() {
+            @Override 
+            public Boolean execute(Transaction tx) {
+             return  tx.run(statement, Values.parameters(
+                  "id1", id1,
+                  "id2", id2)).next().get(0).asBoolean();
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+  @Override
+  public long aliLogin(final long id) throws Exception {
+    final String statement = ali_login_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.writeTransaction(new TransactionWork<Long>() {
+            @Override 
+            public Long execute(Transaction tx) {
+             return  tx.run(statement, Values.parameters(
+                  "id", id)).next().get(0).asLong();
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+  @Override
+  public long aliReg(final Node node) throws Exception {
+    final String statement = ali_reg_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.writeTransaction(new TransactionWork<Long>() {
+            @Override 
+            public Long execute(Transaction tx) {
+              return tx.run(statement, Values.parameters("id", node.id,
+                                              "time", node.time,
+                                              "version", node.version,
+                                              "data", stringLiteral(node.data))).next().get(0).asLong();
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+  @Override
+  public long aliRegRef(final Node node, final long referrer) throws Exception {
+    final String statement = ali_reg_ref_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.writeTransaction(new TransactionWork<Long>() {
+            @Override 
+            public Long execute(Transaction tx) {
+              return tx.run(statement, Values.parameters("id", node.id,
+                                              "time", node.time,
+                                              "version", node.version,
+                                              "data", stringLiteral(node.data),
+                                              "referrer", referrer)).next().get(0).asLong();
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+  @Override
+  public boolean aliPay(final long id1, final long id2) throws Exception {
+    final String statement = ali_pay_query;
+    try (Session session = driver.session()) {
+      while (true) { // retry for deadlock
+        try {
+          return session.writeTransaction(new TransactionWork<Boolean>() {
+            @Override 
+            public Boolean execute(Transaction tx) {
+              return tx.run(statement, Values.parameters("id1", id1,
+                                              "id2", id2
+                                              )).next().get(0).asBoolean();
+            }
+          });
+        } catch (TransientException e) {
+          retries += 1;
+          continue; // retry for deadlock
+        }
+      } // end while, retry  for deadlock
+    } catch (Exception e) {
+      throw e;
+    }
+  }
   /**
    * Convert a byte array into a valid mysql string literal, assuming that
    * it will be inserted into a column with latin-1 encoding.

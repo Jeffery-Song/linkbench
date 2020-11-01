@@ -19,6 +19,7 @@ import java.util.Properties;
 import java.util.Random;
 
 import com.facebook.LinkBench.Config;
+import com.facebook.LinkBench.LinkBenchConfigError;
 import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.InvertibleShuffler;
 import com.facebook.LinkBench.LinkStore;
@@ -31,7 +32,7 @@ import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
  * @author tarmstrong
  *
  */
-public class ID2Chooser {
+public class ID2Chooser extends ID2ChooserBase {
 
   /*
    * Constants controlling the desired probability of a link for (id1, link_type, id2)
@@ -70,7 +71,7 @@ public class ID2Chooser {
   private final int requesterID;
 
   public ID2Chooser(Properties props, long startid1, long maxid1,
-                    int nrequesters, int requesterID) {
+                    int nrequesters, int requesterID) throws LinkBenchConfigError  {
     this.startid1 = startid1;
     this.maxid1 = maxid1;
     this.nrequesters = nrequesters;
@@ -135,7 +136,7 @@ public class ID2Chooser {
 
 
   public long[] chooseMultipleForOp(Random rng, long id1, long linkType,
-      int nid2s, double pExisting) {
+      int nid2s, double pExisting) throws Exception {
     long id2s[] = new long[nid2s];
     long nlinks = calcLinkCount(id1, linkType);
     long range = calcID2Range(pExisting, nlinks);
@@ -219,7 +220,7 @@ public class ID2Chooser {
     return id2;
   }
 
-  public boolean sameShuffle;
+  // public boolean sameShuffle;
   /**
    * Calculates the original number of outlinks for a given id1 (i.e. the
    * number that would have been loaded)

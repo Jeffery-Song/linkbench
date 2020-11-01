@@ -98,6 +98,17 @@ public interface NodeStore {
    */
   public boolean deleteNode(String dbid, int type, long id) throws Exception;
 
+  // returns updated node count
+  public long aliLogin(long id) throws Exception;
+  // returns updated node count, new node id is returned through node.id
+  // node id is assigned by linkbench, rather than db.
+  public long aliReg(Node node) throws Exception;
+  // returns updated node count, new node id is returned through node.id
+  // node id is assigned by linkbench, rather than db.
+  public long aliRegRef(Node node, long referrer) throws Exception;
+  // nothing to return
+  public boolean aliPay(long id1, long id2) throws Exception;
+
   public void clearErrors(int loaderId);
 
   /**

@@ -23,6 +23,8 @@ import java.util.Properties;
 public abstract class LinkStore {
   // void createLinkTable();
   public static final long DEFAULT_LINK_TYPE = 123456789;
+  public static final long REFERRER_LINK_TYPE = DEFAULT_LINK_TYPE - 1;
+  public static final long TRANSFER_FAKE_LINK_TYPE = DEFAULT_LINK_TYPE + 1;
   public static final long MAX_ID2 = Long.MAX_VALUE;
   public static final int DEFAULT_NODE_TYPE = 2048;
 
@@ -194,4 +196,11 @@ public abstract class LinkStore {
     throw new UnsupportedOperationException("addBulkCounts not supported for " +
       "LinkStore subclass " + this.getClass().getName());
   }
+  // return all links
+  public abstract Node[] aliGetFan(long id) throws Exception;
+  // return all nodes
+  public abstract Node[] aliGetFollow(long id) throws Exception;
+  public abstract Node[] aliRecom(long id) throws Exception;
+  public abstract boolean aliFollow(Link l) throws Exception;
+  public abstract boolean aliUnfollow(long id1, long id2) throws Exception;
 }

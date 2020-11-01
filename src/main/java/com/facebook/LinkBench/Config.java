@@ -110,6 +110,18 @@ public class Config {
   public static final String PR_DELETE_NODE = "deletenode";
   public static final String PR_GET_NODE = "getnode";
   public static final String PR_GETLINKLIST_HISTORY = "getlinklist_history";
+
+  public static final String PR_ALI_LOGIN      = "pr_ali_login";
+  public static final String PR_ALI_REG        = "pr_ali_reg";
+  public static final String PR_ALI_PAY        = "pr_ali_pay";
+  public static final String PR_ALI_GET_FAN    = "pr_ali_get_fan";
+  public static final String PR_ALI_GET_FOLLOW = "pr_ali_get_follow";
+  public static final String PR_ALI_RECOM      = "pr_ali_recom";
+  public static final String PR_ALI_FOLLOW     = "pr_ali_follow";
+  public static final String PR_ALI_UNFOLLOW   = "pr_ali_unfollow";
+
+  public static final String REFERRER_SEED = "ali_referrer_seed";
+
   public static final String WARMUP_TIME = "warmup_time";
   public static final String MAX_TIME = "maxtime";
   public static final String REQUEST_RATE = "requestrate";

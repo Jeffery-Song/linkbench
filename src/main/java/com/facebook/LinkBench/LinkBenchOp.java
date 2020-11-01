@@ -36,6 +36,16 @@ public enum LinkBenchOp {
   RANGE_SIZE,    // how big range scans are
   LOAD_LINKS_BULK_NLINKS, // how many links inserted in bulk
   LOAD_COUNTS_BULK_NLINKS, // how many counts inserted in bulk
+
+  ALI_LOGIN,
+  ALI_REG,
+  ALI_PAY,
+  ALI_GET_FAN,
+  ALI_GET_FOLLOW,
+  ALI_RECOM,
+  ALI_FOLLOW,
+  ALI_UNFOLLOW,
+
   UNKNOWN;
 
   public String displayName() {
