@@ -55,7 +55,7 @@ public class ID2ChooserTest extends TestCase {
 
     long id1 = 1234;
     for (int i = 0; i < nlinks; i++) {
-      long id2 = c.chooseForLoad(rng, id1, LinkStore.DEFAULT_LINK_TYPE, i);
+      long id2 = c.chooseForLoad(rng, id1, LinkBase.LINKBENCH_DEFAULT_TYPE, i);
       Integer j = seen.get(id2);
       if (j != null) {
         fail("Same link generated twice: (" + id1 + ", " + id2 + ") for " +
@@ -77,10 +77,10 @@ public class ID2ChooserTest extends TestCase {
     int trials = 1000;
     ID2Chooser c = new ID2Chooser(props, min, max, 1, 1);
     for (int i = 0; i < trials; i++) {
-      long id2 = c.chooseForOp(rng, i + min, LinkStore.DEFAULT_LINK_TYPE, 1.0);
+      long id2 = c.chooseForOp(rng, i + min, LinkBase.LINKBENCH_DEFAULT_TYPE, 1.0);
       assert(id2 >= min);
 
-      id2 = c.chooseForOp(rng, i + min, LinkStore.DEFAULT_LINK_TYPE, 0.5);
+      id2 = c.chooseForOp(rng, i + min, LinkBase.LINKBENCH_DEFAULT_TYPE, 0.5);
       assert(id2 >= min);
     }
   }
@@ -101,7 +101,7 @@ public class ID2ChooserTest extends TestCase {
       long nlinks = chooser.calcTotalLinkCount(id1);
       for (long i = 0; i < nlinks; i++) {
         long id2 = chooser.chooseForLoad(rng, id1,
-                                LinkStore.DEFAULT_LINK_TYPE, i);
+                                LinkBase.LINKBENCH_DEFAULT_TYPE, i);
         existing.add(id2);
       }
 
@@ -112,11 +112,11 @@ public class ID2ChooserTest extends TestCase {
       for (int i = 0; i < trials; i++) {
         // Test with 100% prob of hit
         long id2 = chooser.chooseForOp(rng, id1,
-                                          LinkStore.DEFAULT_LINK_TYPE, 1.0);
+                                          LinkBase.LINKBENCH_DEFAULT_TYPE, 1.0);
         assertTrue(existing.contains(id2) || existing.size() == 0);
 
         // Test with 50% prob of hit
-        id2 = chooser.chooseForOp(rng, id1, LinkStore.DEFAULT_LINK_TYPE, 0.5);
+        id2 = chooser.chooseForOp(rng, id1, LinkBase.LINKBENCH_DEFAULT_TYPE, 0.5);
         if (existing.contains(id2)) {
           hit++;
         }

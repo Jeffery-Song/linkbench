@@ -18,12 +18,13 @@ package com.facebook.LinkBench;
 import java.util.Arrays;
 
 
-public class Link {
+public class Link extends LinkBase {
   private static String[] _fields = {"id1", "id2", "link_type", "visibility", "data", "version", "time"};
-  public static String[] fields() {
+  public String[] fields() {
     return _fields;
   }
-  public static boolean fieldIsString(int idx) {
+  public int getType() { return (int)link_type; }
+  public boolean fieldIsString(int idx) {
     return idx == 4;
   }
   public Object getField(int idx) {
@@ -41,6 +42,7 @@ public class Link {
 
   public Link(long id1, long link_type, long id2,
       byte visibility, byte[] data, int version, long time) {
+    super();
     this.id1 = id1;
     this.link_type = link_type;
     this.id2 = id2;
@@ -51,10 +53,12 @@ public class Link {
   }
 
   Link() {
-    link_type = LinkStore.DEFAULT_LINK_TYPE;
+    super();
+    link_type = LinkBase.LINKBENCH_DEFAULT_TYPE;
     visibility = LinkStore.VISIBILITY_DEFAULT;
   }
 
+  @Override
   public boolean equals(Object other) {
     if (other instanceof Link) {
       Link o = (Link) other;

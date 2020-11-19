@@ -14,29 +14,24 @@
  * limitations under the License.
  */
 package com.facebook.LinkBench;
-
-import java.util.Arrays;
-
 /**
  * Object node in social graph
  * @author tarmstrong
  */
-public class Node extends NodeBase {
-  private static String[] _fields = {"id", "type", "version", "time", "data"};
+public class UserNode extends NodeBase {
+  private static String[] _fields = {"id", "liveness", "time"};
   public String[] fields() {
     return _fields;
   }
-  public int getType() { return type; }
   public boolean fieldIsString(int idx) {
-    return idx == 4;
+    return false;
   }
+  public int getType() { return 1; }
   public Object getField(int idx) {
     switch (idx) {
       case 0: return id;
-      case 1: return type;
-      case 2: return version;
-      case 3: return time;
-      case 4: return data;
+      case 1: return liveness;
+      case 2: return time;
       default: assert(false); return null;
     }
   }
@@ -44,43 +39,35 @@ public class Node extends NodeBase {
   public long id;
 
   /** Type of node */
-  public int type;
 
   /** Version of node: typically updated on every change */
-  public long version;
+  public long liveness;
 
   /** Last update time of node as UNIX timestamp */
-  public int time;
+  public long time;
 
-  /** Arbitrary payload data */
-  public byte data[];
-
-  public Node(long id, int type, long version, int time,
-      byte data[]) {
+  public UserNode(long id, long liveness, long time) {
     super();
     this.id = id;
-    this.type = type;
-    this.version = version;
+    this.liveness = liveness;
     this.time = time;
-    this.data = data;
   }
 
-  public Node clone() {
-    return new Node(id, type, version, time, data);
+  public UserNode clone() {
+    return new UserNode(id, liveness, time);
   }
   @Override
   public boolean equals(Object other) {
-    if (!(other instanceof Node)) {
+    if (!(other instanceof UserNode)) {
       return false;
     }
-    Node o = (Node) other;
-    return id == o.id && type == o.type && version == o.version
-        && time == o.time && Arrays.equals(data, o.data);
+    UserNode o = (UserNode) other;
+    return id == o.id && liveness == o.liveness
+        && time == o.time;
   }
 
   public String toString() {
-    return "Node(" + "id=" + id + ",type=" + type + ",version=" + version + ","
-                   + "timestamp=" + time + ",data="
-                   + Arrays.toString(data) + ")";
+    return "UserNode(" + "id=" + id + ",liveness=" + liveness + ","
+                   + "timestamp=" + time + ")";
   }
 }

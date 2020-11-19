@@ -22,6 +22,7 @@ import com.facebook.LinkBench.Config;
 import com.facebook.LinkBench.LinkBenchConfigError;
 import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.InvertibleShuffler;
+import com.facebook.LinkBench.LinkBase;
 import com.facebook.LinkBench.LinkStore;
 import com.facebook.LinkBench.RealDistribution;
 import com.facebook.LinkBench.RealDistribution.DistributionType;
@@ -261,7 +262,7 @@ public class ID2Chooser extends ID2ChooserBase {
     long res[] = new long[linkTypeCount];
     // Just have link types in a sequence starting at the default one
     for (int i = 0; i < linkTypeCount; i++) {
-      res[i] = LinkStore.DEFAULT_LINK_TYPE + i;
+      res[i] = LinkBase.LINKBENCH_DEFAULT_TYPE + i;
     }
     return res;
   }
@@ -271,7 +272,7 @@ public class ID2Chooser extends ID2ChooserBase {
    * For now just select each type with equal probability.
    */
   public long chooseRandomLinkType(Random rng) {
-    return LinkStore.DEFAULT_LINK_TYPE + rng.nextInt(linkTypeCount);
+    return LinkBase.LINKBENCH_DEFAULT_TYPE + rng.nextInt(linkTypeCount);
   }
 
   public long calcLinkCount(long id1, long linkType) {
@@ -279,7 +280,7 @@ public class ID2Chooser extends ID2ChooserBase {
     long totCount = calcTotalLinkCount(id1);
     long minCount = totCount / linkTypeCount;
     long leftOver = totCount - minCount;
-    int typeNum = (int)(linkType -LinkStore.DEFAULT_LINK_TYPE);
+    int typeNum = (int)(linkType - LinkBase.LINKBENCH_DEFAULT_TYPE);
     if (typeNum < leftOver) {
       return minCount + 1;
     } else {

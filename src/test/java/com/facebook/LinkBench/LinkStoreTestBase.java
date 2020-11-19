@@ -341,7 +341,7 @@ public abstract class LinkStoreTestBase extends TestCase {
   public void testMultiget() throws IOException, Exception {
     DummyLinkStore store = getStoreHandle(true);
     long id1 = 99999999999L;
-    Link a = new Link(id1, LinkStore.DEFAULT_LINK_TYPE, 42,
+    Link a = new Link(id1, LinkBase.LINKBENCH_DEFAULT_TYPE, 42,
                       LinkStore.VISIBILITY_DEFAULT, new byte[0], 1,
                       System.currentTimeMillis());
     Link b = a.clone();
@@ -790,7 +790,7 @@ public abstract class LinkStoreTestBase extends TestCase {
 
     LoadProgress tracker = new LoadProgress(logger, idCount, 1000);
     tracker.startTimer();
-    LinkBenchLoad loader = new LinkBenchLoad(store,
+    LinkBenchLoad loader = new LinkBenchLoad(
         props, latencyStats, System.out, 0, false, chunk_q, tracker);
     /* Run the loading process */
     loader.run();
@@ -804,10 +804,10 @@ public abstract class LinkStoreTestBase extends TestCase {
       long startId, long idCount, int linksPerId, long maxTimestamp)
                                                           throws Exception {
     for (long i = startId; i < startId + idCount; i++) {
-      assertEquals(wrappedStore.countLinks(testDB, i, LinkStore.DEFAULT_LINK_TYPE),
+      assertEquals(wrappedStore.countLinks(testDB, i, LinkBase.LINKBENCH_DEFAULT_TYPE),
                    linksPerId);
 
-      Link links[] = wrappedStore.getLinkList(testDB, i, LinkStore.DEFAULT_LINK_TYPE);
+      Link links[] = wrappedStore.getLinkList(testDB, i, LinkBase.LINKBENCH_DEFAULT_TYPE);
       if (linksPerId == 0) {
         assertTrue(links == null);
       } else {
@@ -815,7 +815,7 @@ public abstract class LinkStoreTestBase extends TestCase {
         long lastTimestamp = Long.MAX_VALUE;
         for (Link l: links) {
           assertEquals(l.id1, i);
-          assertEquals(l.link_type, LinkStore.DEFAULT_LINK_TYPE);
+          assertEquals(l.link_type, LinkBase.LINKBENCH_DEFAULT_TYPE);
           assertEquals(l.visibility, LinkStore.VISIBILITY_DEFAULT);
           // Check timestamp correc
           if (l.time > maxTimestamp) {
@@ -836,7 +836,7 @@ public abstract class LinkStoreTestBase extends TestCase {
       throws Exception {
     // attempt to delete data
     for (long i = startId; i < startId + idCount; i++) {
-      Link links[] = store.getLinkList(testDB, i, LinkStore.DEFAULT_LINK_TYPE);
+      Link links[] = store.getLinkList(testDB, i, LinkBase.LINKBENCH_DEFAULT_TYPE);
       if (links != null) {
         for (Link l: links) {
           assert(l != null);

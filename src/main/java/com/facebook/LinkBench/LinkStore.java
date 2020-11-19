@@ -22,9 +22,6 @@ import java.util.Properties;
 
 public abstract class LinkStore {
   // void createLinkTable();
-  public static final long DEFAULT_LINK_TYPE = 123456789;
-  public static final long REFERRER_LINK_TYPE = DEFAULT_LINK_TYPE - 1;
-  public static final long TRANSFER_FAKE_LINK_TYPE = DEFAULT_LINK_TYPE + 1;
   public static final long MAX_ID2 = Long.MAX_VALUE;
   public static final int DEFAULT_NODE_TYPE = 2048;
 

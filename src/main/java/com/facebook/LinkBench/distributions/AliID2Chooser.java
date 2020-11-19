@@ -24,9 +24,12 @@ import com.facebook.LinkBench.Config;
 import com.facebook.LinkBench.LinkBenchConfigError;
 import com.facebook.LinkBench.ConfigUtil;
 import com.facebook.LinkBench.InvertibleShuffler;
+import com.facebook.LinkBench.LinkBase;
 import com.facebook.LinkBench.LinkStore;
 import com.facebook.LinkBench.RealDistribution;
 import com.facebook.LinkBench.RealDistribution.DistributionType;
+import com.facebook.LinkBench.alimeta.UserToDev;
+import com.facebook.LinkBench.alimeta.UserToIP;
 import com.facebook.LinkBench.distributions.LinkDistributions.LinkDistribution;
 
 /**
@@ -38,6 +41,9 @@ public class AliID2Chooser extends ID2ChooserBase {
 
   private ID2Chooser inner_chooser; 
   private long referrer_seed;
+  private UserToDev userToDev;
+  private UserToIP userToIP;
+
 
   public AliID2Chooser(Properties props, long startid1, long maxid1,
                     int nrequesters, int requesterID) {
@@ -46,6 +52,9 @@ public class AliID2Chooser extends ID2ChooserBase {
     }
     this.inner_chooser = new ID2Chooser(props, startid1, maxid1, nrequesters, requesterID);
     this.referrer_seed = ConfigUtil.getLong(props, Config.REFERRER_SEED, System.currentTimeMillis());
+
+    this.userToDev = new UserToDev(props);
+    this.userToIP = new UserToIP(props);
   }
 
   /**
@@ -58,20 +67,33 @@ public class AliID2Chooser extends ID2ChooserBase {
    */
   public long chooseForLoad(Random rng, long id1, long link_type,
                                                   long outlink_ix) {
-    if (link_type == LinkStore.REFERRER_LINK_TYPE) {
-      if (id1 == 1 || id1 == 0) {
-        System.err.println("id 0 1 can not have referrer");
-        System.exit(1);
+    switch ((int)link_type) {
+      case LinkBase.REFERRER_TYPE: {
+        if (id1 == 1 || id1 == 0) {
+          System.err.println("id 0 1 can not have referrer");
+          System.exit(1);
+        }
+        if (calcLinkCount(id1, link_type) <= outlink_ix) {
+          System.err.println("out link ix exceeds out link count");
+          System.exit(1);
+        }
+        Random r = new Random(id1 * referrer_seed * referrer_seed);
+        // generate random id inali_referrer_seed range [1,id1)
+        return Math.floorMod(r.nextLong(), id1 - 1) + 1;
       }
-      if (calcLinkCount(id1, link_type) <= outlink_ix) {
-        System.err.println("out link ix exceeds out link count");
-        System.exit(1);
+      case LinkBase.USE_DEVICE_TYPE: {
+        return userToDev.mapUserToId(id1)[(int)outlink_ix];
       }
-      Random r = new Random(id1 * referrer_seed * referrer_seed);
-      // generate random id inali_referrer_seed range [1,id1)
-      return Math.floorMod(r.nextLong(), id1 - 1) + 1;
+      case LinkBase.USE_IP_TYPE: {
+        return userToIP.mapUserToId(id1)[(int)outlink_ix];
+      }
+      case LinkBase.FOLLOW_TYPE: {
+        return inner_chooser.chooseForLoad(rng, id1, link_type, outlink_ix);
+      }
+      default:
+        System.exit(1);
+        return 0L;
     }
-    return inner_chooser.chooseForLoad(rng, id1, link_type, outlink_ix);
   }
 
   /**
@@ -85,7 +107,7 @@ public class AliID2Chooser extends ID2ChooserBase {
   public long chooseForOp(Random rng, long id1, long linkType,
                                                 double pExisting) throws Exception {
     // if type is ref, this must be the insert new node case
-    if (linkType == LinkStore.REFERRER_LINK_TYPE) {
+    if (linkType == LinkBase.REFERRER_TYPE) {
       // in insert case, id1 is unknown, so we just randomly generate id2.
       // but how do we determine the range?
       if (id1 == 1 || id1 == 0) throw new Exception("id 0 1 can not have referrer");
@@ -94,7 +116,7 @@ public class AliID2Chooser extends ID2ChooserBase {
       // generate random id in range [1,id1)
       return Math.floorMod(r.nextLong(), id1 - 1) + 1;
     }
-    return inner_chooser.chooseForOp(rng, id1, LinkStore.DEFAULT_LINK_TYPE, pExisting);
+    return inner_chooser.chooseForOp(rng, id1, LinkBase.LINKBENCH_DEFAULT_TYPE, pExisting);
   }
 
   public long[] chooseMultipleForOp(Random rng, long id1, long linkType,
@@ -103,7 +125,7 @@ public class AliID2Chooser extends ID2ChooserBase {
   }
 
   public long[] getLinkTypes() {
-    return new long[] {LinkStore.REFERRER_LINK_TYPE, LinkStore.DEFAULT_LINK_TYPE};
+    return new long[] {LinkBase.USE_DEVICE_TYPE, LinkBase.USE_IP_TYPE, LinkBase.REFERRER_TYPE, LinkBase.FOLLOW_TYPE};
   }
 
   /**
@@ -111,16 +133,29 @@ public class AliID2Chooser extends ID2ChooserBase {
    * For now just select each type with equal probability.
    */
   public long chooseRandomLinkType(Random rng) {
-    return LinkStore.DEFAULT_LINK_TYPE;
+    return LinkBase.LINKBENCH_DEFAULT_TYPE;
   }
 
   public long calcLinkCount(long id1, long linkType) {
-    if (linkType == LinkStore.REFERRER_LINK_TYPE) {
-      if (id1 == 1) return 0;
-      Random r = new Random(id1 * referrer_seed);
-      return (r.nextInt(10) >= 1) ? 1 : 0;
+    switch ((int)linkType) {
+      case LinkBase.USE_DEVICE_TYPE: {
+        return userToDev.metaCountOnLoad(id1);
+      }
+      case LinkBase.USE_IP_TYPE: {
+        return userToIP.metaCountOnLoad(id1);
+      }
+      case LinkBase.REFERRER_TYPE: {
+        if (id1 == 1) return 0;
+        Random r = new Random(id1 * referrer_seed);
+        return (r.nextInt(10) >= 1) ? 1 : 0;
+      }
+      case LinkBase.FOLLOW_TYPE: {
+        return inner_chooser.calcLinkCount(id1, linkType);
+      }
+      default:
+        System.exit(1);
+        return 0L;
     }
-    return inner_chooser.calcLinkCount(id1, linkType);
   }
 
 }

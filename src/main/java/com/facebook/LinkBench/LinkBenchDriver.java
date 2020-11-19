@@ -227,6 +227,8 @@ public class LinkBenchDriver {
 
 
     boolean bulkLoad = true;
+    // shared queue, containing all chunks. fast workers take more.
+    // each chunk contains start id and stop id.
     BlockingQueue<LoadChunk> chunk_q = new LinkedBlockingQueue<LoadChunk>();
 
     // max id1 to generate
@@ -250,10 +252,9 @@ public class LinkBenchDriver {
 
     LoadProgress loadTracker = LoadProgress.create(logger, props);
     for (int i = 0; i < nLinkLoaders; i++) {
-      LinkStore linkStore = createLinkStore();
-
-      bulkLoad = bulkLoad && linkStore.bulkLoadBatchSize() > 0;
-      LinkBenchLoad l = new LinkBenchLoad(linkStore, props, latencyStats,
+      // bulkLoad = bulkLoad && linkStore.bulkLoadBatchSize() > 0;
+      
+      LinkBenchLoad l = new LinkBenchLoad(props, latencyStats,
               csvStreamFile, i, maxid1 == startid1 + 1, chunk_q, loadTracker);
       loaders.add(l);
     }

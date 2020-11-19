@@ -42,6 +42,7 @@ public class LinkStoreCCGraph extends GraphStore {
   private static AtomicLong _nodeid;
   private Measurements _measurements = Measurements.getMeasurements();
   private boolean is_ali = true;
+  private boolean ali_given_path = false;
   
   /** Construct client connecting to HelloWorld server at {@code host:port}. */
   // public LinkStoreCCGraph(String host, int port) {
@@ -59,6 +60,12 @@ public class LinkStoreCCGraph extends GraphStore {
     } else {
       // long maxId = ConfigUtil.getLong(props, Config.MAX_ID);
       _nodeid = new AtomicLong(ConfigUtil.getLong(p, com.facebook.LinkBench.Config.MAX_ID));
+    }
+    ali_given_path = ConfigUtil.getBool(p, "ali.request_via_explicit_path", false);
+    if (ali_given_path == true) {
+      System.err.println("ali: login path is given");
+    } else {
+      System.err.println("ali: login path is not given");
     }
     String host = p.getProperty("host", "127.0.0.1");
     int port = Integer.parseInt(p.getProperty("port", "55555"));
@@ -376,9 +383,13 @@ public class LinkStoreCCGraph extends GraphStore {
 
     CallParam.Builder rqst = CallParam.newBuilder();
 
-    rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.id)));
-
-    rqst.setTxnName(ByteString.copyFromUtf8("ali_login"));
+    if (ali_given_path) {
+      rqst.addParamList(ByteString.copyFromUtf8(AliPath.pathstring.get((int)(node.id))));
+      rqst.setTxnName(ByteString.copyFromUtf8("ali_login_given_path"));
+    } else {
+      rqst.addParamList(ByteString.copyFromUtf8(String.valueOf(node.id)));
+      rqst.setTxnName(ByteString.copyFromUtf8("ali_login"));
+    }
     rqst.setRetry(true);
 
     Results rply = blockingStub.runTxn(rqst.build());

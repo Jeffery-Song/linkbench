@@ -749,9 +749,9 @@ public class LinkBenchRequest implements Runnable {
         type = LinkBenchOp.ALI_REG;
         Node newNode = createAddNode();
         newNode.id = _nodeid.getAndIncrement();
-        if (id2chooser.calcLinkCount(newNode.id, LinkStore.REFERRER_LINK_TYPE) == 1) {
+        if (id2chooser.calcLinkCount(newNode.id, LinkBase.REFERRER_TYPE) == 1) {
           starttime = System.nanoTime();
-          long referrer_id = id2chooser.chooseForOp(rng, newNode.id, LinkStore.REFERRER_LINK_TYPE, 1);
+          long referrer_id = id2chooser.chooseForOp(rng, newNode.id, LinkBase.REFERRER_TYPE, 1);
           nodeStore.aliRegRef(newNode, referrer_id);
           endtime = System.nanoTime();
         } else {
@@ -770,7 +770,7 @@ public class LinkBenchRequest implements Runnable {
         // generate add request
         type = LinkBenchOp.ALI_PAY;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
-        link.id2 = id2chooser.chooseForOp(rng, link.id1, LinkStore.TRANSFER_FAKE_LINK_TYPE,
+        link.id2 = id2chooser.chooseForOp(rng, link.id1, LinkBase.TRANSFER_FAKE_LINK_TYPE,
                                                 ID2Chooser.P_UPDATE_EXIST);
 
         starttime = System.nanoTime();
@@ -829,7 +829,7 @@ public class LinkBenchRequest implements Runnable {
         // tabek from add link
         type = LinkBenchOp.ALI_FOLLOW;
         link.id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
-        link.link_type = LinkStore.DEFAULT_LINK_TYPE;
+        link.link_type = LinkBase.LINKBENCH_DEFAULT_TYPE;
         link.id2 = id2chooser.chooseForOp(rng, link.id1, link.link_type,
                                                 ID2Chooser.P_ADD_EXIST);
         link.time = System.currentTimeMillis();
@@ -845,14 +845,14 @@ public class LinkBenchRequest implements Runnable {
         // taken from delete link
         type = LinkBenchOp.ALI_UNFOLLOW;
         long id1 = chooseRequestID(DistributionType.LINK_WRITES, link.id1);
-        long id2 = id2chooser.chooseForOp(rng, id1, LinkStore.DEFAULT_LINK_TYPE,
+        long id2 = id2chooser.chooseForOp(rng, id1, LinkBase.LINKBENCH_DEFAULT_TYPE,
                                           ID2Chooser.P_DELETE_EXIST);
         starttime = System.nanoTime();
-        linkStore.deleteLink(dbid, id1, LinkStore.DEFAULT_LINK_TYPE, id2, true, // no inverse
+        linkStore.deleteLink(dbid, id1, LinkBase.LINKBENCH_DEFAULT_TYPE, id2, true, // no inverse
             false);
         endtime = System.nanoTime();
         if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-          logger.trace("ali unfollow id1=" + id1 + " link_type=" + LinkStore.DEFAULT_LINK_TYPE
+          logger.trace("ali unfollow id1=" + id1 + " link_type=" + LinkBase.LINKBENCH_DEFAULT_TYPE
                      + " id2=" + id2);
         }
         _measurements.measure(type.displayName(), (endtime - starttime)/1000);

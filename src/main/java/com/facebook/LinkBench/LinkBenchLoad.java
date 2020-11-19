@@ -18,8 +18,6 @@ package com.facebook.LinkBench;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -31,6 +29,8 @@ import org.apache.log4j.Logger;
 
 import com.facebook.LinkBench.distributions.ID2ChooserBase;
 import com.facebook.LinkBench.distributions.ID2Chooser;
+import com.facebook.LinkBench.alimeta.UserToDev;
+import com.facebook.LinkBench.alimeta.UserToIP;
 import com.facebook.LinkBench.distributions.AliID2Chooser;
 import com.facebook.LinkBench.distributions.LogNormalDistribution;
 import com.facebook.LinkBench.generators.DataGenerator;
@@ -56,8 +56,11 @@ public class LinkBenchLoad implements Runnable {
   private long maxid1;   // max id1 to generate
   private long startid1; // id1 at which to start
   private int  loaderID; // ID for this loader
-  private LinkStore store;// store interface (several possible implementations
+
+  // private LinkStore store;// store interface (several possible implementations
                           // like mysql, hbase etc)
+
+  private GraphSerializerCSV csvGraph;
 
   private final LogNormalDistribution linkDataSize;
   private final DataGenerator linkDataGen; // Generate link data
@@ -70,6 +73,8 @@ public class LinkBenchLoad implements Runnable {
   String dbid;
 
   private ID2ChooserBase id2chooser;
+
+  private LinkConstructor linkConstructor;
 
   // Counters for load statistics
   long sameShuffle;
@@ -101,11 +106,11 @@ public class LinkBenchLoad implements Runnable {
    * @param loaderID
    * @param nloaders
    */
-  public LinkBenchLoad(LinkStore store, Properties props,
+  public LinkBenchLoad(Properties props,
       LatencyStats latencyStats, PrintStream csvStreamOut,
       int loaderID, boolean singleAssoc,
       int nloaders, LoadProgress prog_tracker, Random rng) {
-    this(store, props, latencyStats, csvStreamOut, loaderID, singleAssoc,
+    this(props, latencyStats, csvStreamOut, loaderID, singleAssoc,
               new ArrayBlockingQueue<LoadChunk>(2), prog_tracker);
 
     // Just add a single chunk to the queue
@@ -113,9 +118,7 @@ public class LinkBenchLoad implements Runnable {
     chunk_q.add(LoadChunk.SHUTDOWN);
   }
 
-
-  public LinkBenchLoad(LinkStore linkStore,
-                       Properties props,
+  public LinkBenchLoad(Properties props,
                        LatencyStats latencyStats,
                        PrintStream csvStreamOut,
                        int loaderID,
@@ -125,7 +128,7 @@ public class LinkBenchLoad implements Runnable {
     /*
      * Initialize fields from arguments
      */
-    this.store = linkStore;
+    this.csvGraph = new GraphSerializerCSV();
     this.props = props;
     this.latencyStats = latencyStats;
     this.loaderID = loaderID;
@@ -180,8 +183,10 @@ public class LinkBenchLoad implements Runnable {
     is_ali = ConfigUtil.getBool(props, "is_ali");
     if (is_ali) {
       id2chooser = new AliID2Chooser(props, startid1, maxid1, 1, 1);
+      linkConstructor = new AliLinkConstructor();
     } else {
       id2chooser = new ID2Chooser(props, startid1, maxid1, 1, 1);
+      linkConstructor = new LBLinkConstructor();
     }
   }
 
@@ -192,19 +197,17 @@ public class LinkBenchLoad implements Runnable {
   @Override
   public void run() {
     try {
-      this.store.initialize(props, Phase.LOAD, loaderID);
+      this.csvGraph.initialize(props, Phase.LOAD, loaderID);
     } catch (Exception e) {
       logger.error("Error while initializing store", e);
       throw new RuntimeException(e);
     }
 
-    int bulkLoadBatchSize = store.bulkLoadBatchSize();
+    int bulkLoadBatchSize = csvGraph.bulkLoadBatchSize();
     boolean bulkLoad = bulkLoadBatchSize > 0;
-    ArrayList<Link> loadBuffer = null;
-    ArrayList<LinkCount> countLoadBuffer = null;
+    ArrayList<LinkBase> loadBuffer = null;
     if (bulkLoad) {
-      loadBuffer = new ArrayList<Link>(bulkLoadBatchSize);
-      countLoadBuffer = new ArrayList<LinkCount>(bulkLoadBatchSize);
+      loadBuffer = new ArrayList<LinkBase>(bulkLoadBatchSize);
     }
 
     logger.info("Starting loader thread  #" + loaderID + " loading links");
@@ -227,13 +230,12 @@ public class LinkBenchLoad implements Runnable {
 
       // Load the link range specified in the chunk
       processChunk(chunk, bulkLoad, bulkLoadBatchSize,
-                    loadBuffer, countLoadBuffer);
+                    loadBuffer);
     }
 
     if (bulkLoad) {
       // Load any remaining links or counts
       loadLinks(loadBuffer);
-      loadCounts(countLoadBuffer);
     }
 
     if (!singleAssoc) {
@@ -242,7 +244,7 @@ public class LinkBenchLoad implements Runnable {
       displayStats(lastDisplayTime, bulkLoad);
     }
 
-    store.close();
+    csvGraph.close();
   }
 
 
@@ -260,8 +262,7 @@ public class LinkBenchLoad implements Runnable {
   }
 
   private void processChunk(LoadChunk chunk, boolean bulkLoad,
-      int bulkLoadBatchSize, ArrayList<Link> loadBuffer,
-      ArrayList<LinkCount> countLoadBuffer) {
+      int bulkLoadBatchSize, ArrayList<LinkBase> loadBuffer) {
     if (Level.DEBUG.isGreaterOrEqual(debuglevel)) {
       logger.debug("Loader thread  #" + loaderID + " processing "
                   + chunk.toString());
@@ -270,16 +271,9 @@ public class LinkBenchLoad implements Runnable {
     // Counter for total number of links loaded in chunk;
     long links_in_chunk = 0;
 
-    Link link = null;
-    if (!bulkLoad) {
-      // When bulk-loading, need to have multiple link objects at a time
-      // otherwise reuse object
-      link = initLink();
-    }
-
     long prevPercentPrinted = 0;
     for (long id1 = chunk.start; id1 < chunk.end; id1 += chunk.step) {
-      long added_links= createOutLinks(chunk.rng, link, loadBuffer, countLoadBuffer,
+      long added_links= createOutLinks(chunk.rng, loadBuffer,
           id1, singleAssoc, bulkLoad, bulkLoadBatchSize);
       links_in_chunk += added_links;
 
@@ -309,7 +303,7 @@ public class LinkBenchLoad implements Runnable {
   }
 
   /**
-   * Create the out links for a given id1
+   * Create and load the out links for a given id1
    * @param link
    * @param loadBuffer
    * @param id1
@@ -319,14 +313,9 @@ public class LinkBenchLoad implements Runnable {
    * @return total number of links added
    */
   private long createOutLinks(Random rng,
-      Link link, ArrayList<Link> loadBuffer,
-      ArrayList<LinkCount> countLoadBuffer,
+      ArrayList<LinkBase> loadBuffer,
       long id1, boolean singleAssoc, boolean bulkLoad,
       int bulkLoadBatchSize) {
-    Map<Long, LinkCount> linkTypeCounts = null;
-    if (bulkLoad) {
-      linkTypeCounts = new HashMap<Long, LinkCount>();
-    }
     long nlinks_total = 0;
 
     for (long link_type: id2chooser.getLinkTypes()) {
@@ -347,12 +336,8 @@ public class LinkBenchLoad implements Runnable {
       long constructCount = 0;
       long loadCount = 0;
       for (long j = 0; j < nlinks; j++) {
-        if (bulkLoad) {
-          // Can't reuse link object
-          link = initLink();
-        }
         long ts1 = System.nanoTime();
-        constructLink(rng, link, id1, link_type, j, singleAssoc);
+        LinkBase link = linkConstructor.constructLink(rng, id1, link_type, j, singleAssoc);
         long ts2 = System.nanoTime();
         constructTime += ts2 - ts1;
         constructCount += 1;
@@ -361,18 +346,6 @@ public class LinkBenchLoad implements Runnable {
           loadBuffer.add(link);
           if (loadBuffer.size() >= bulkLoadBatchSize) {
             loadLinks(loadBuffer);
-          }
-
-          // Update link counts for this type
-          LinkCount count = linkTypeCounts.get(link.link_type);
-          if (count == null) {
-            count = new LinkCount(id1, link.link_type,
-                                  link.time, link.version, 1);
-            linkTypeCounts.put(link.link_type, count);
-          } else {
-            count.count++;
-            count.time = Math.max(count.time, link.time);
-            count.version = link.version;
           }
         } else {
           ts1 = System.nanoTime();
@@ -394,67 +367,95 @@ public class LinkBenchLoad implements Runnable {
       }
 
     }
-
-    // Maintain the counts separately
-    if (bulkLoad) {
-      for (LinkCount count: linkTypeCounts.values()) {
-        countLoadBuffer.add(count);
-        if (countLoadBuffer.size() >= bulkLoadBatchSize) {
-          loadCounts(countLoadBuffer);
-        }
-      }
-    }
     return nlinks_total;
   }
-
-  private Link initLink() {
-    Link link = new Link();
-    link.link_type = LinkStore.DEFAULT_LINK_TYPE;
-    link.visibility = LinkStore.VISIBILITY_DEFAULT;
-    link.version = 0;
-    link.data = new byte[0];
-    link.time = System.currentTimeMillis();
-    return link;
+  interface LinkConstructor {
+    /**
+     * Helper method to fill in link data
+     * @param link this link is filled in.  Should have been initialized with
+     *            initLink() earlier
+     * @param outlink_ix the number of this link out of all outlinks from
+     *                    id1
+     * @param singleAssoc whether we are in singleAssoc mode
+     */
+    public LinkBase constructLink(Random rng, long id1, long link_type, 
+                                  long outlink_ix, boolean singleAssoc);
   }
+  class LBLinkConstructor implements LinkConstructor {
+    public LinkBase constructLink(Random rng, long id1, long link_type, 
+                                  long outlink_ix, boolean singleAssoc) {
+      Link link = new Link();
+      link.id1 = id1;
+      link.link_type = link_type;
+      link.visibility = LinkBase.LINKBENCH_VISIBILITY_DEFAULT;
+      link.version = 0;
+      link.data = new byte[0];
+      link.time = System.currentTimeMillis();
 
-  /**
-   * Helper method to fill in link data
-   * @param link this link is filled in.  Should have been initialized with
-   *            initLink() earlier
-   * @param outlink_ix the number of this link out of all outlinks from
-   *                    id1
-   * @param singleAssoc whether we are in singleAssoc mode
-   */
-  private void constructLink(Random rng, Link link, long id1,
-      long link_type, long outlink_ix, boolean singleAssoc) {
-    link.id1 = id1;
-    link.link_type = link_type;
+      // Using random number generator for id2 means we won't know
+      // which id2s exist. So link id1 to
+      // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
+      // config randomid2max is nonzero.
+      if (singleAssoc) {
+        link.id2 = 45; // some constant
+      } else {
+        link.id2 = id2chooser.chooseForLoad(rng, id1, link_type,outlink_ix);
+        int datasize = (int)linkDataSize.choose(rng);
+        link.data = linkDataGen.fill(rng, new byte[datasize]);
+      }
 
-    // Using random number generator for id2 means we won't know
-    // which id2s exist. So link id1 to
-    // maxid1 + id1 + 1 thru maxid1 + id1 + nlinks(id1) UNLESS
-    // config randomid2max is nonzero.
+      if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
+        logger.trace("id2 chosen is " + link.id2);
+      }
+      // }
 
-    // if (is_ali) {
-      
-    // } else {
-    if (singleAssoc) {
-      link.id2 = 45; // some constant
-    } else {
-      link.id2 = id2chooser.chooseForLoad(rng, id1, link_type,outlink_ix);
-      int datasize = (int)linkDataSize.choose(rng);
-      link.data = linkDataGen.fill(rng, new byte[datasize]);
+      // Randomize time so that id2 and timestamp aren't closely correlated
+      link.time = chooseInitialTimestamp(rng);
+      return link;
     }
-
-    if (Level.TRACE.isGreaterOrEqual(debuglevel)) {
-      logger.trace("id2 chosen is " + link.id2);
-    }
-    // }
-
-    // Randomize time so that id2 and timestamp aren't closely correlated
-    link.time = chooseInitialTimestamp(rng);
   }
-
+  class AliLinkConstructor implements LinkConstructor {
+    public LinkBase constructLink(Random rng, long id1, long link_type, 
+                                  long outlink_ix, boolean singleAssoc) {
+      switch ((int)link_type) {
+        case LinkBase.USE_DEVICE_TYPE: {
+          LinkUseDevIP link = new LinkUseDevIP();
+          link.type = LinkBase.USE_DEVICE_TYPE;
+          link.id1 = id1;
+          link.id2 = id2chooser.chooseForLoad(rng, id1, link_type, outlink_ix);
+          link.address = UserToDev.idToDevMac(link.id2);
+          link.time = chooseInitialTimestamp(rng);
+          return link;
+        }
+        case LinkBase.USE_IP_TYPE: {
+          LinkUseDevIP link = new LinkUseDevIP();
+          link.type = LinkBase.USE_IP_TYPE;
+          link.id1 = id1;
+          link.id2 = id2chooser.chooseForLoad(rng, id1, link_type, outlink_ix);
+          link.address = UserToIP.idToIpAddr(link.id2);
+          link.time = chooseInitialTimestamp(rng);
+          return link;
+        }
+        case LinkBase.REFERRER_TYPE: {
+          LinkReferrer link = new LinkReferrer();
+          link.id1 = id1;
+          link.id2 = id2chooser.chooseForLoad(rng, id1, link_type, outlink_ix);
+          return link;
+        }
+        case LinkBase.FOLLOW_TYPE: {
+          LinkFollow link = new LinkFollow();
+          link.id1 = id1;
+          link.id2 = id2chooser.chooseForLoad(rng, id1, link_type, outlink_ix);
+          link.time = chooseInitialTimestamp(rng);
+          return link;
+        }
+        default:
+          System.err.println("Unknown link type to construct!");
+          System.exit(1);
+          return null;
+      }
+    }
+  }
 
   private long chooseInitialTimestamp(Random rng) {
     // Choose something from now back to about 50 days
@@ -472,7 +473,7 @@ public class LinkBenchLoad implements Runnable {
    * @param nlinks
    * @param singleAssoc
    */
-  private void loadLink(Link link, long outlink_ix, long nlinks,
+  private void loadLink(LinkBase link, long outlink_ix, long nlinks,
       boolean singleAssoc) {
     long timestart = 0;
     if (!singleAssoc) {
@@ -481,7 +482,7 @@ public class LinkBenchLoad implements Runnable {
 
     try {
       // no inverses for now
-      store.addLink(dbid, link, true);
+      csvGraph.addLink(dbid, link, true);
       linksloaded++;
 
       if (!singleAssoc && outlink_ix == nlinks - 1) {
@@ -499,16 +500,15 @@ public class LinkBenchLoad implements Runnable {
         long timetaken2 = (endtime2 - timestart)/1000;
         logger.error("Error: " + e.getMessage(), e);
         stats.addStats(LinkBenchOp.LOAD_LINK, timetaken2, true);
-        store.clearErrors(loaderID);
     }
   }
 
-  private void loadLinks(ArrayList<Link> loadBuffer) {
+  private void loadLinks(ArrayList<LinkBase> loadBuffer) {
     long timestart = System.nanoTime();
     try {
       // no inverses for now
       int nlinks = loadBuffer.size();
-      store.addBulkLinks(dbid, loadBuffer, true);
+      csvGraph.addBulkLinks(dbid, loadBuffer, true);
       linksloaded += nlinks;
       loadBuffer.clear();
 
@@ -525,33 +525,6 @@ public class LinkBenchLoad implements Runnable {
         long timetaken2 = (endtime2 - timestart)/1000;
         logger.error("Error: " + e.getMessage(), e);
         stats.addStats(LinkBenchOp.LOAD_LINKS_BULK, timetaken2, true);
-        store.clearErrors(loaderID);
-    }
-  }
-
-  private void loadCounts(ArrayList<LinkCount> loadBuffer) {
-    long timestart = System.nanoTime();
-
-    try {
-      // no inverses for now
-      int ncounts = loadBuffer.size();
-      store.addBulkCounts(dbid, loadBuffer);
-      loadBuffer.clear();
-
-      long timetaken = (System.nanoTime() - timestart);
-
-      // convert to microseconds
-      stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK, timetaken/1000, false);
-      stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK_NLINKS, ncounts, false);
-
-      latencyStats.recordLatency(loaderID, LinkBenchOp.LOAD_COUNTS_BULK,
-                                                             timetaken/1000);
-    } catch (Throwable e){//Catch exception if any
-        long endtime2 = System.nanoTime();
-        long timetaken2 = (endtime2 - timestart)/1000;
-        logger.error("Error: " + e.getMessage(), e);
-        stats.addStats(LinkBenchOp.LOAD_COUNTS_BULK, timetaken2, true);
-        store.clearErrors(loaderID);
     }
   }
 

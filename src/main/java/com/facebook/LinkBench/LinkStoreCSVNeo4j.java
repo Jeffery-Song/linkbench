@@ -159,11 +159,11 @@ public class LinkStoreCSVNeo4j extends GraphStore {
   private String formatLink(Link l) {
     StringBuilder sb = new StringBuilder();
     sb.append("" + l.id1 + "|" + l.id2);
-    for (int i = 0; i < Link.fields().length; i++) {
-      if (Link.fields()[i].equals("id1")) continue;
-      if (Link.fields()[i].equals("id2")) continue;
-      // if (Link.fields()[i].equals("link_type")) continue;
-      if (Link.fieldIsString(i)) 
+    for (int i = 0; i < l.fields().length; i++) {
+      if (l.fields()[i].equals("id1")) continue;
+      if (l.fields()[i].equals("id2")) continue;
+      // if (l.fields()[i].equals("link_type")) continue;
+      if (l.fieldIsString(i)) 
         sb.append("|\"" + stringLiteral((byte[])l.getField(i)) + "\"");
       else
         sb.append("|" + l.getField(i).toString());
@@ -289,11 +289,11 @@ public class LinkStoreCSVNeo4j extends GraphStore {
   private String formatNode(Node n) {
     StringBuilder sb = new StringBuilder();
     sb.append("" + n.id);
-    for (int i = 0; i < Node.fields().length; i++) {
+    for (int i = 0; i < n.fields().length; i++) {
       if (n.type != 2048) System.err.println("We hanve more than one node type");
-      if (Node.fields()[i].equals("id")) continue;
-      // if (Node.fields()[i].equals("type")) continue;
-      if (Node.fieldIsString(i)) 
+      if (n.fields()[i].equals("id")) continue;
+      // if (n.fields()[i].equals("type")) continue;
+      if (n.fieldIsString(i)) 
         sb.append("|\"" + stringLiteral((byte[])n.getField(i)) + "\"");
       else
         sb.append("|" + n.getField(i).toString());
