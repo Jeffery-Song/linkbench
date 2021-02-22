@@ -34,6 +34,16 @@ public abstract class DevIPNode extends NodeBase {
       default: assert(false); return null;
     }
   }
+  protected abstract String embedAddr();
+  @Override
+  public String getFieldString(int idx) {
+    // TODO Auto-generated method stub
+    switch (idx) {
+      case 0: return embedAddr();
+      case 1: return Long.toString(time);
+      default: assert(false); return null;
+    }
+  }
 
   /** ip or mac address */
   public byte address[];

@@ -19,11 +19,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
-// import java.sql.Connection;
-// import java.sql.DriverManager;
-// import java.sql.ResultSet;
-// import java.sql.Neo4jException;
-// import java.sql.Statement;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,6 +50,9 @@ import org.neo4j.driver.v1.Values;
 import org.neo4j.driver.v1.exceptions.TransientException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import com.facebook.LinkBench.alimeta.UserToDev;
+import com.facebook.LinkBench.alimeta.UserToIP;
 import com.facebook.LinkBench.measurements.Measurements;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -120,14 +118,12 @@ public class LinkStoreNeo4j extends GraphStore {
   private String get_link_query;
   private String get_link_list_query;
   private String get_node_query;
-  // private String update_link_query;
   private String update_node_query;
   private String delete_link_query;
   private String delete_link_expunge_query;
   private String delete_node_query;
   private String multiget_link_query;
   private String count_link_query;
-  // private String template_query;
 
 
   private String ali_login_query;
@@ -140,10 +136,6 @@ public class LinkStoreNeo4j extends GraphStore {
   private String ali_follow_query;
   private String ali_unfollow_query;
 
-  // String linktable;
-  // String counttable;
-  // String nodetable;
-
   String host;
   String user;
   String pwd;
@@ -152,22 +144,17 @@ public class LinkStoreNeo4j extends GraphStore {
   long addlinkcount = 0;
   long addlinktime = 0;
   long addlinktxruntime = 0;
-  // String defaultDB;
 
   Level debuglevel;
-  // Use read-only and read-write connections and statements to avoid toggling
-  // auto-commit.
-  // Connection conn_ro, conn_rw;
-  // Statement stmt_ro, stmt_rw;
   private Driver driver = null;
   private static Driver driver_s = null;
-  // private Session session;
 
   private Phase phase;
 
   int bulkInsertSize = DEFAULT_BULKINSERT_SIZE;
-  // Optional optimization: disable binary logging
-  // boolean disableBinLogForLoad = false;
+
+  int devLimit;
+  int ipLimit;
 
   private final Logger logger = Logger.getLogger(ConfigUtil.LINKBENCH_LOGGER);
 
@@ -216,7 +203,8 @@ public class LinkStoreNeo4j extends GraphStore {
       // long maxId = ConfigUtil.getLong(props, Config.MAX_ID);
       _nodeid = new AtomicLong(ConfigUtil.getLong(props, com.facebook.LinkBench.Config.MAX_ID));
     }
-
+    devLimit = ConfigUtil.getInt(props, com.facebook.LinkBench.Config.ALI_DEV_LIMIT);
+    ipLimit = ConfigUtil.getInt(props, com.facebook.LinkBench.Config.ALI_IP_LIMIT);
     add_link_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_LINK_QUERY));
     add_only_link_query =       loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_ONLY_LINK_QUERY));
     add_node_query =            loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ADD_NODE_QUERY));
@@ -231,7 +219,7 @@ public class LinkStoreNeo4j extends GraphStore {
     multiget_link_query =       loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_MULTIGET_LINK_QUERY));
     count_link_query =          loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_COUNT_LINK_QUERY));
 
-    use_given_path = ConfigUtil.getBool(props, "ali.request_via_explicit_path", false);
+    use_given_path = ConfigUtil.getBool(props, com.facebook.LinkBench.Config.ALI_USE_PATH, false);
     if (use_given_path) {
       String fname = ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY);
       update_node_query = loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_UPDATE_NODE_GIVEN_PATH_QUERY));
@@ -244,6 +232,7 @@ public class LinkStoreNeo4j extends GraphStore {
 
     ali_login_query =               loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_LOGIN_QUERY));
     ali_reg_query =                 loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_REG_QUERY));
+    ali_reg_ref_query =             loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_REG_REF_QUERY));
     ali_pay_query =                 loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_PAY_QUERY));
     ali_get_fan_query =             loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_GET_FAN_QUERY));
     ali_get_follow_query =          loadFromFile(ConfigUtil.getPropertyRequired(props, CONFIG_ALI_GET_FOLLOW_QUERY));
@@ -359,10 +348,10 @@ public class LinkStoreNeo4j extends GraphStore {
       while (true) { // retry for deadlock
         try {
 
-          MyTuple ret = session.writeTransaction(new TransactionWork<MyTuple>() {
+          int ret = session.writeTransaction(new TransactionWork<Integer>() {
             @Override 
-            public MyTuple execute(Transaction tx) {
-              MyTuple ret = new MyTuple();
+            public Integer execute(Transaction tx) {
+              int ret;
               // true for covered create
               // System.err.println("Query is " + insert);
               StatementResult sr = tx.run(insert, Values.parameters(
@@ -374,15 +363,15 @@ public class LinkStoreNeo4j extends GraphStore {
                   "version", l.version));
               // long ts1 = System.nanoTime();
               if (sr.hasNext() == false) {
-                ret.ret = 2;
+                ret = 2;
                 // long ts2 = System.nanoTime();
-                // ret.time = ts2-ts1;
+                // time = ts2-ts1;
               } else {
                 boolean b = sr.next().get(0).asBoolean();
                 // long ts2 = System.nanoTime();
-                ret.ret = 0; // 0 for fresh creat, 1 for covered, 2 for err
+                ret = 0; // 0 for fresh creat, 1 for covered, 2 for err
                 if (b) {
-                  ret.ret = 1;
+                  ret = 1;
                 }
                 // ret.time = ts2-ts1;
               }
@@ -401,10 +390,10 @@ public class LinkStoreNeo4j extends GraphStore {
           //   addlinktime = 0;
           //   addlinktxruntime = 0;
           // }
-          if (ret.ret == 2) {
+          if (ret == 2) {
             throw new MissingException("Adding link, missing node1.id=" + l.id1 + " or 2.id=" + l.id2);
           }
-          return ret.ret == 1;
+          return ret == 1;
           // break;
         } catch (TransientException e) {
           retries += 1;
@@ -898,30 +887,29 @@ public class LinkStoreNeo4j extends GraphStore {
       throw e;
     }
   }
-
   @Override
-  public Node[] aliGetFan(final long id) throws Exception {
+  public UserNode[] aliGetFan(final long id, final int offset, final int limit) throws Exception {
     final String statement = ali_get_fan_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
         try {
-          return session.readTransaction(new TransactionWork<Node[]>() {
+          return session.readTransaction(new TransactionWork<UserNode[]>() {
             @Override 
-            public Node[] execute(Transaction tx) {
+            public UserNode[] execute(Transaction tx) {
               List<Record> list = tx.run(statement, Values.parameters(
-                  "id", id)).list();
-              if (list.size() == 0) return new Node[0];
-              Node[] nodelist = new Node[list.size()];
+                  "id", id,
+                  "offset", offset,
+                  "limit", limit)).list();
+              if (list.size() == 0) return new UserNode[0];
+              UserNode[] nodelist = new UserNode[list.size()];
 
               for (int i = 0; i < list.size(); i++) {
-                // Value val = tx.run(statement).next().get(0);
-                Record val = list.get(i);          
-                Node n = new Node(
-                  val.get("id").asLong(),
-                  LinkStore.DEFAULT_NODE_TYPE, 
-                                      val.get("version").asLong(), 
-                                      val.get("time").asInt(), 
-                                      val.get("data").asString().getBytes());
+                Record val = list.get(i);
+                UserNode n = new UserNode(
+                  val.get("id").asLong(), 
+                  val.get("liveness").asLong(), 
+                  val.get("time").asLong(),
+                  val.get("balance").asLong());
                 nodelist[i] = n;
               }
               return nodelist;
@@ -938,28 +926,28 @@ public class LinkStoreNeo4j extends GraphStore {
   }
 
   @Override
-  public Node[] aliGetFollow(final long id) throws Exception {
+  public UserNode[] aliGetFollow(final long id, final int offset, final int limit) throws Exception {
     final String statement = ali_get_follow_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
         try {
-          return session.readTransaction(new TransactionWork<Node[]>() {
+          return session.readTransaction(new TransactionWork<UserNode[]>() {
             @Override 
-            public Node[] execute(Transaction tx) {
+            public UserNode[] execute(Transaction tx) {
               List<Record> list = tx.run(statement, Values.parameters(
-                  "id", id)).list();
-              if (list.size() == 0) return new Node[0];
-              Node[] nodelist = new Node[list.size()];
+                  "id", id,
+                  "offset", offset,
+                  "limit", limit)).list();
+              if (list.size() == 0) return new UserNode[0];
+              UserNode[] nodelist = new UserNode[list.size()];
 
               for (int i = 0; i < list.size(); i++) {
-                // Value val = tx.run(statement).next().get(0);
-                Record val = list.get(i);          
-                Node n = new Node(
+                Record val = list.get(i);
+                UserNode n = new UserNode(
                   val.get("id").asLong(),
-                  LinkStore.DEFAULT_NODE_TYPE, 
-                                      val.get("version").asLong(), 
-                                      val.get("time").asInt(), 
-                                      val.get("data").asString().getBytes());
+                  val.get("liveness").asLong(),
+                  val.get("time").asLong(),
+                  val.get("balance").asLong());
                 nodelist[i] = n;
               }
               return nodelist;
@@ -975,28 +963,27 @@ public class LinkStoreNeo4j extends GraphStore {
     }
   }
   @Override
-  public Node[] aliRecom(final long id) throws Exception {
+  public UserNode[] aliRecom(final long id) throws Exception {
     final String statement = ali_recom_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
         try {
-          return session.readTransaction(new TransactionWork<Node[]>() {
+          return session.readTransaction(new TransactionWork<UserNode[]>() {
             @Override 
-            public Node[] execute(Transaction tx) {
+            public UserNode[] execute(Transaction tx) {
               List<Record> list = tx.run(statement, Values.parameters(
                   "id", id)).list();
-              if (list.size() == 0) return new Node[0];
-              Node[] nodelist = new Node[list.size()];
+              if (list.size() == 0) return new UserNode[0];
+              UserNode[] nodelist = new UserNode[list.size()];
 
               for (int i = 0; i < list.size(); i++) {
                 // Value val = tx.run(statement).next().get(0);
                 Record val = list.get(i);          
-                Node n = new Node(
-                  val.get("id").asLong(),
-                  LinkStore.DEFAULT_NODE_TYPE, 
-                                      val.get("version").asLong(), 
-                                      val.get("time").asInt(), 
-                                      val.get("data").asString().getBytes());
+                UserNode n = new UserNode(
+                  val.get("id").asLong(), 
+                  val.get("liveness").asLong(), 
+                  val.get("time").asLong(),
+                  val.get("balance").asLong());
                 nodelist[i] = n;
               }
               return nodelist;
@@ -1013,7 +1000,7 @@ public class LinkStoreNeo4j extends GraphStore {
   }
 
   @Override
-  public boolean aliFollow(final Link l) throws Exception {
+  public boolean aliFollow(final LinkFollow l) throws Exception {
     final String statement = ali_follow_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
@@ -1024,10 +1011,7 @@ public class LinkStoreNeo4j extends GraphStore {
              return  tx.run(statement, Values.parameters(
                   "id1", l.id1,
                   "id2", l.id2,
-                  "visibility", (int)l.visibility,
-                  "data", stringLiteral(l.data),
-                  "time", l.time,
-                  "version", l.version)).next().get(0).asBoolean();
+                  "time", l.time)).next().get(0).asBoolean();
             }
           });
         } catch (TransientException e) {
@@ -1063,7 +1047,10 @@ public class LinkStoreNeo4j extends GraphStore {
     }
   }
   @Override
-  public long aliLogin(final long id) throws Exception {
+  public long aliLogin(final long id, final long embedMacAddr, final long embedIPAddr, final long timestamp) throws Exception {
+    return aliLogin(id, UserToDev.embedMacToByte(embedMacAddr), UserToIP.embedIPToByte(embedIPAddr), timestamp);
+  }
+  public long aliLogin(final long id, final byte[] macAddr, final byte[] ipAddr, final long timestamp) throws Exception {
     final String statement = ali_login_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
@@ -1072,7 +1059,12 @@ public class LinkStoreNeo4j extends GraphStore {
             @Override 
             public Long execute(Transaction tx) {
              return  tx.run(statement, Values.parameters(
-                  "id", id)).next().get(0).asLong();
+                  "id", id,
+                  "macAddr", stringLiteral(macAddr),
+                  "ipAddr", stringLiteral(ipAddr),
+                  "time", timestamp,
+                  "ipLimit", ipLimit,
+                  "devLimit", devLimit)).next().get(0).asLong();
             }
           });
         } catch (TransientException e) {
@@ -1085,7 +1077,10 @@ public class LinkStoreNeo4j extends GraphStore {
     }
   }
   @Override
-  public long aliReg(final Node node) throws Exception {
+  public long aliReg(final UserNode node, final long embedMacAddr, final long embedIPAddr) throws Exception {
+    return aliReg(node, UserToDev.embedMacToByte(embedMacAddr), UserToIP.embedIPToByte(embedIPAddr));
+  }
+  public long aliReg(final UserNode node, final byte[] macAddr, final byte[] ipAddr) throws Exception {
     final String statement = ali_reg_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
@@ -1093,10 +1088,14 @@ public class LinkStoreNeo4j extends GraphStore {
           return session.writeTransaction(new TransactionWork<Long>() {
             @Override 
             public Long execute(Transaction tx) {
-              return tx.run(statement, Values.parameters("id", node.id,
-                                              "time", node.time,
-                                              "version", node.version,
-                                              "data", stringLiteral(node.data))).next().get(0).asLong();
+              return tx.run(statement, Values.parameters(
+                "id", node.id,
+                "time", node.time,
+                "liveness", node.liveness,
+                "macAddr", stringLiteral(macAddr),
+                "ipAddr", stringLiteral(ipAddr),
+                "ipLimit", ipLimit,
+                "devLimit", devLimit)).next().get(0).asLong();
             }
           });
         } catch (TransientException e) {
@@ -1109,7 +1108,12 @@ public class LinkStoreNeo4j extends GraphStore {
     }
   }
   @Override
-  public long aliRegRef(final Node node, final long referrer) throws Exception {
+  public long aliRegRef(final UserNode node, final long referrer, final long embedMacAddr, final long embedIPAddr)
+      throws Exception {
+    return aliRegRef(node, referrer, UserToDev.embedMacToByte(embedMacAddr), UserToIP.embedIPToByte(embedIPAddr));
+  }
+  public long aliRegRef(final UserNode node, final long referrer, final byte[] macAddr, final byte[] ipAddr)
+      throws Exception {
     final String statement = ali_reg_ref_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
@@ -1117,11 +1121,15 @@ public class LinkStoreNeo4j extends GraphStore {
           return session.writeTransaction(new TransactionWork<Long>() {
             @Override 
             public Long execute(Transaction tx) {
-              return tx.run(statement, Values.parameters("id", node.id,
-                                              "time", node.time,
-                                              "version", node.version,
-                                              "data", stringLiteral(node.data),
-                                              "referrer", referrer)).next().get(0).asLong();
+              return tx.run(statement, Values.parameters(
+                "id", node.id,
+                "time", node.time,
+                "liveness", node.liveness,
+                "macAddr", stringLiteral(macAddr),
+                "ipAddr", stringLiteral(ipAddr),
+                "referrer", referrer,
+                "ipLimit", ipLimit,
+                "devLimit", devLimit)).next().get(0).asLong();
             }
           });
         } catch (TransientException e) {
@@ -1134,7 +1142,7 @@ public class LinkStoreNeo4j extends GraphStore {
     }
   }
   @Override
-  public boolean aliPay(final long id1, final long id2) throws Exception {
+  public boolean aliPay(final long id1, final long id2, final long amount) throws Exception {
     final String statement = ali_pay_query;
     try (Session session = driver.session()) {
       while (true) { // retry for deadlock
@@ -1142,9 +1150,10 @@ public class LinkStoreNeo4j extends GraphStore {
           return session.writeTransaction(new TransactionWork<Boolean>() {
             @Override 
             public Boolean execute(Transaction tx) {
-              return tx.run(statement, Values.parameters("id1", id1,
-                                              "id2", id2
-                                              )).next().get(0).asBoolean();
+              return tx.run(statement, Values.parameters(
+                "id1", id1,
+                "id2", id2,
+                "amount", amount)).next().get(0).asBoolean();
             }
           });
         } catch (TransientException e) {

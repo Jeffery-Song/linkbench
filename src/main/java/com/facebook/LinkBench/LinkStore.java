@@ -194,10 +194,10 @@ public abstract class LinkStore {
       "LinkStore subclass " + this.getClass().getName());
   }
   // return all links
-  public abstract Node[] aliGetFan(long id) throws Exception;
+  public abstract UserNode[] aliGetFan(long id, int offset, int limit) throws Exception;
   // return all nodes
-  public abstract Node[] aliGetFollow(long id) throws Exception;
-  public abstract Node[] aliRecom(long id) throws Exception;
-  public abstract boolean aliFollow(Link l) throws Exception;
+  public abstract UserNode[] aliGetFollow(long id, int offset, int limit) throws Exception;
+  public abstract UserNode[] aliRecom(long id) throws Exception;
+  public abstract boolean aliFollow(LinkFollow l) throws Exception;
   public abstract boolean aliUnfollow(long id1, long id2) throws Exception;
 }

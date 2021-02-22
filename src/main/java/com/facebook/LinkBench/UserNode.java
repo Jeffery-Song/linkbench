@@ -19,19 +19,21 @@ package com.facebook.LinkBench;
  * @author tarmstrong
  */
 public class UserNode extends NodeBase {
-  private static String[] _fields = {"id", "liveness", "time"};
+  private static String[] _fields = {"id", "liveness", "time", "balance", "id"};
   public String[] fields() {
     return _fields;
   }
   public boolean fieldIsString(int idx) {
     return false;
   }
-  public int getType() { return 1; }
+  public int getType() { return NodeBase.USER_TYPE; }
   public Object getField(int idx) {
     switch (idx) {
       case 0: return id;
       case 1: return liveness;
       case 2: return time;
+      case 3: return balance;
+      case 4: return id;
       default: assert(false); return null;
     }
   }
@@ -46,15 +48,18 @@ public class UserNode extends NodeBase {
   /** Last update time of node as UNIX timestamp */
   public long time;
 
-  public UserNode(long id, long liveness, long time) {
+  public long balance;
+
+  public UserNode(long id, long liveness, long time, long balance) {
     super();
     this.id = id;
     this.liveness = liveness;
     this.time = time;
+    this.balance = balance;
   }
 
   public UserNode clone() {
-    return new UserNode(id, liveness, time);
+    return new UserNode(id, liveness, time, balance);
   }
   @Override
   public boolean equals(Object other) {
@@ -63,11 +68,11 @@ public class UserNode extends NodeBase {
     }
     UserNode o = (UserNode) other;
     return id == o.id && liveness == o.liveness
-        && time == o.time;
+        && time == o.time && balance == o.balance;
   }
 
   public String toString() {
     return "UserNode(" + "id=" + id + ",liveness=" + liveness + ","
-                   + "timestamp=" + time + ")";
+                   + "timestamp=" + time + ",balance=" + balance + ")";
   }
 }

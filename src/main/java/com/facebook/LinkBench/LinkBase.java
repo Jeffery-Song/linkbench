@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 package com.facebook.LinkBench;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
 
 public abstract class LinkBase {
   public static final int USE_DEVICE_TYPE = 11;
@@ -27,6 +30,13 @@ public abstract class LinkBase {
   public abstract int getType();
   public abstract boolean fieldIsString(int idx);
   public abstract Object getField(int idx);
+  public String getFieldString(int idx) {
+    if (fieldIsString(idx)) {
+      return "\"" + stringLiteral((byte[])getField(idx)) + "\"";
+    } else {
+      return getField(idx).toString();
+    }
+  }
 
   public LinkBase() {}
 
@@ -60,5 +70,49 @@ public abstract class LinkBase {
         System.exit(1);
         return "";
       }
+  }
+  private static String stringLiteral(byte arr[]) {
+    CharBuffer cb = Charset.forName("ISO-8859-1").decode(ByteBuffer.wrap(arr));
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < cb.length(); i++) {
+      char c = cb.get(i);
+      switch (c) {
+        case '\"':
+          sb.append("\\\"");
+          break;
+        case '\'':
+          sb.append("\\'");
+          break;
+        case '\\':
+          sb.append("\\\\");
+          break;
+        case '\0':
+          sb.append("\\0");
+          break;
+        case '\b':
+          sb.append("\\b");
+          break;
+        case '\n':
+          sb.append("\\n");
+          break;
+        case '\r':
+          sb.append("\\r");
+          break;
+        case '\t':
+          sb.append("\\t");
+          break;
+        case '\f':
+          sb.append("\\f");
+          break;
+        default:
+          // if (Character.getNumericValue(c) < 0) {
+          //   // Fall back on hex string for values not defined in latin-1
+          //   return hexStringLiteral(arr);
+          // } else {
+            sb.append(c);
+          // }
+      }
+    }
+    return sb.toString();
   }
 }

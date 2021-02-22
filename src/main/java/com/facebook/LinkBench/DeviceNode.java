@@ -17,6 +17,8 @@ package com.facebook.LinkBench;
 
 import java.util.Arrays;
 
+import com.facebook.LinkBench.alimeta.UserToDev;
+
 /**
  * Object node in social graph
  * @author tarmstrong
@@ -28,6 +30,11 @@ public class DeviceNode extends DevIPNode {
     super(address, time);
     this.address = address;
     this.time = time;
+  }
+
+  @Override
+  protected String embedAddr() {
+    return Long.toString(UserToDev.byteMacToEmbed(address));
   }
 
   public DeviceNode clone() {
