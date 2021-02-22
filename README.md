@@ -471,3 +471,8 @@ has permissions to create and drop tables.
 
 **If you implement a plugin for a new database, please consider contributing
 it back to the main LinkBench distribution with a pull request.**
+
+
+build neo4j index:
+
+CREATE INDEX ON :nt(id);
